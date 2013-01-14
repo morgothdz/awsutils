@@ -111,13 +111,14 @@ class S3Bucket():
         @param hashcheck: bool
         """
         if chunklen < 5242880:
-            raise Exception("Your proposed upload is smaller than the minimum allowed size")
+            raise Exception("Your proposed upload is smaller than the minimum allowed (by amazon) size")
 
         wrappedobj = SimpleWindowedFileObjectReadWrapper(obj=output, start=start, end=end, hashcheck=hashcheck)
 
-        #if file size bigger than given threshold start process file as multipart upload
-        if wrappedobj.size <= chunklen:
-            result = self.s3client.putObject(bucketname=self.name, objectname=objectname, value=wrappedobj, objlen=wrappedobj.size)
+        #if file size bigger than given threshold (the minnimum allowed chunklength * 2) start process file as multipart
+        if wrappedobj.size < chunklen * 2:
+            result = self.s3client.putObject(bucketname=self.name, objectname=objectname, value=wrappedobj,
+                                             objlen=wrappedobj.size)
             #TODO: hashcheck
             return result
 
@@ -127,7 +128,6 @@ class S3Bucket():
         try:
             parts = {}
             for partnumber in range(1, 10000):
-
                 if chunklen * 2 > (end - start):
                     tosendlen = (end - start)
                 else:
@@ -138,7 +138,8 @@ class S3Bucket():
                     break
 
                 result = self.s3client.uploadOjectPart(bucketname=self.name, objectname=objectname,
-                                                       partnumber=partnumber, uploadid=upload['UploadId'], value=wrappedobj,
+                                                       partnumber=partnumber, uploadid=upload['UploadId'],
+                                                       value=wrappedobj,
                                                        objlen=wrappedobj.size)
 
                 if hashcheck and result['ETag'][1:-1] != wrappedobj.getMd5HexDigest():
@@ -149,7 +150,8 @@ class S3Bucket():
 
                 start += tosendlen
 
-            result = self.s3client.completeMultipartUpload(bucketname=self.name, objectname=objectname, uploadId=upload['UploadId'], parts=parts)
+            result = self.s3client.completeMultipartUpload(bucketname=self.name, objectname=objectname,
+                                                           uploadId=upload['UploadId'], parts=parts)
             #TODO: global hashcheck
             print("completeMultipartUpload", result)
             print(wrappedobj.getGlobalMd5HexDigest())
