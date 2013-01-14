@@ -22,10 +22,11 @@ Highlights
 ==========
 #. Python3.x compatible amazon web services library
 #. HTTP connection pool with "Connection: keep-alive"
-#. direct amazon api like access seconded by higher level access encapsulated
-in various classes (ex: the generic s3client then the higher level s3.service,
-s3.bucket and s3.object classes)
-#. S3 support (still very limited)
+#. Direct amazon api like access seconded by higher level access encapsulated 
+   in various classes (ex: the generic s3client then the higher level s3.service, 
+   s3.bucket and s3.object classes)
+#. S3 support (limited yet)
+
 
 Near Future Plans
 =================
@@ -43,7 +44,7 @@ Help Needed On
 #. Documentation
 #. Automated tests
 #. I am not planning python2.x features, there is the "boto" project more than
-enough for cover that road.
+   enough for cover that road.
 #. My english is pretty poor so feel free on helping me to the right track :)
 
 Contributing
