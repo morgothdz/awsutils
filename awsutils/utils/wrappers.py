@@ -4,8 +4,6 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-__author__ = 'Dark'
-
 import os, io, hashlib
 
 class SimpleWindowedFileObjectReadWrapper:
