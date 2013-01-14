@@ -1,13 +1,13 @@
 Foreword
 ========
- While I was working on multiple projects I found myself more than once lacking
+While I was working on multiple projects I found myself more than once lacking
 a good python3.x amazon web services library, so I started scratching around the
 subject.
- The project I am working right now requires such a library, so the scratching
+The project I am working right now requires such a library, so the scratching
 turned to a full blown project: awsutils. And because the open source community
 was/is always such a great help, I humbly offer my work to the fellow programmers
 who my be in the same need as I was.
- For the beginning I will strictly add functionality only to cover my needs in
+For the beginning I will strictly add functionality only to cover my needs in
 my current bigger project and to improve reliability. Later I will expand more
 the project based on users input and/or to cover other projects I am working on.
 
