@@ -22,11 +22,23 @@ from awsutils.utils.xmlhandler import AWSXMLHandler
 
 class AWSException(Exception):
     """exceptions raised on amazon error responses"""
-    pass
+    def __init__(self, status, reason, headers, response):
+        self.status = status
+        self.reason = reason
+        self.headers = headers
+        self.response = response
+    def __repr__(self):
+        return repr(self.__dict__)
 
 class AWSDataException(Exception):
-    """exceptions raised on unexpected data received from amazon"""
-    pass
+    def __init__(self, message, status, reason, headers, data):
+        self.message = message
+        self.status = status
+        self.reason = reason
+        self.headers = headers
+        self.data = data
+    def __repr__(self):
+        return repr(self.__dict__)
 
 class AWSTimeout(Exception):
     pass
@@ -34,7 +46,15 @@ class AWSTimeout(Exception):
 class AWSPartialReception(Exception):
     """exceptions raised when there is partial data received from amazon,
     but the request itself failed at some point"""
-    pass
+    def __init__(self, status, reason, headers, data, sizeinfo, exception):
+        self.status = status
+        self.reason = reason
+        self.headers = headers
+        self.data = data
+        self.sizeinfo = sizeinfo
+        self.exception = exception
+    def __repr__(self):
+        return "AWSPartialReception [%d]"%(self.size,)
 
 qsa_of_interest = {'acl', 'cors', 'defaultObjectAcl', 'location', 'logging',
                    'partNumber', 'policy', 'requestPayment', 'torrent',
@@ -163,7 +183,7 @@ class AWSClient:
                 statusexpected=None,
                 xmlexpected=True,
                 retry=3,
-                inputbuffer=None,
+                inputobject=None,
                 operationtimeout=None,
                 receptiontimeout=socket._GLOBAL_DEFAULT_TIMEOUT):
 
@@ -196,7 +216,7 @@ class AWSClient:
             # same for the inputbuffer
             try:
                 if _inputiooffset is None:
-                    _inputiooffset = inputbuffer.tell()
+                    _inputiooffset = inputobject.tell()
             except:
                 pass
 
@@ -239,7 +259,7 @@ class AWSClient:
                 while True:
                     try:
                         if (operationtimeout is not None) and (time.time() - starttime > operationtimeout):
-                            raise AWSTimeout()
+                            raise AWSTimeout('operation timeout')
                         data = response.read(amt=32768)
                     except:
                         # TODO: not all exception should retry, maybe an exception white list would be the way to go
@@ -255,7 +275,7 @@ class AWSClient:
                 if doretry:
                     continue
 
-                data = handler.getdict()
+                awsresponse = handler.getdict()
 
                 if 300 <= response.status < 400:
                     try:
@@ -270,9 +290,9 @@ class AWSClient:
 
                 if response.status not in statusexpected:
                     # TODO: maybe we should retry on some status?
-                    raise AWSException(response.status, response.reason, dict(response.headers), data)
+                    raise AWSException(response.status, response.reason, dict(response.headers), awsresponse)
 
-                return response.status, response.reason, dict(response.headers), data
+                return response.status, response.reason, dict(response.headers), awsresponse
 
             if (response.status not in statusexpected) or ('Content-Length' not in response.headers):
                 #consume input
@@ -285,45 +305,62 @@ class AWSClient:
 
                 if response.status not in statusexpected:
                     #TODO: maybe we should retry on some status?
-                    raise AWSException(response.status, response.reason, dict(response.headers), data)
+                    raise AWSDataException('unexpected status', response.status, response.reason, dict(response.headers), data)
+
                 if 'Content-Length' not in response.headers:
-                    return response.status, response.reason, dict(response.headers), data
+                    raise AWSDataException('missing content length', response.status, response.reason, dict(response.headers), data)
+                    """
+                    size = len(data)
+                    sizeinfo = {'size':size, 'start' : 0, 'end':size - 1, 'downloaded':0}
+                    return response.status, response.reason, dict(response.headers), sizeinfo, data
+                    """
 
             #if we are here then most probably we want to download some data
             size = int(response.headers['Content-Length'])
+            if response.status == 206:
+                contentrange = response.headers['Content-Range']
+                contentrange = contentrange.split(' ')[1].split('/')
+                range = contentrange[0].split('-')
+                sizeinfo = {'size':int(contentrange[1]), 'start' : int(range[0]), 'end':int(range[1]), 'downloaded':0}
+            elif response.status == 200:
+                sizeinfo = {'size':size, 'start' : 0, 'end':size - 1, 'downloaded':0}
 
-            if inputbuffer is None:
+            if inputobject is None:
                 _inputiooffset = 0
                 if size > self.MAX_IN_MEMORY_READ_CHUNK_SIZE_FOR_RAW_DATA:
-                    inputbuffer = tempfile.TemporaryFile(mode="w+b", dir=self.tmpdir, prefix='awstmp-')
+                    inputobject = tempfile.TemporaryFile(mode="w+b", dir=self.tmpdir, prefix='awstmp-')
                 else:
-                    inputbuffer = io.BytesIO()
+                    inputobject = io.BytesIO()
 
             ammount = 0
 
             while True:
                 try:
+
                     if (operationtimeout is not None) and (time.time() - starttime > operationtimeout):
-                        raise AWSTimeout()
+                        raise AWSTimeout('operation timeout')
                     data = response.read(32768)
                     ammount += len(data)
+
                 except Exception as e:
-                    # TODO: not all exception should retry, maybe an exception white list would be the way to go
-                    if _retycount < retry:
-                        _retycount += 1
-                        _inputiooffset = _inputiooffset + ammount
-                        inputbuffer.seek(_inputiooffset, io.SEEK_SET)
-                        break
 
                     if ammount > 0:
                         # don't loose partial data yet, it may be useful even in this situation
-                        raise AWSPartialReception(inputbuffer, ammount, e)
+                        sizeinfo['downloaded'] = ammount
+                        raise AWSPartialReception(headers = dict(response.headers), data = inputobject, sizeinfo = sizeinfo, exception =e)
+
+                    # TODO: not all exception should retry, maybe an exception white list would be the way to go
+                    if _retycount < retry:
+                        _retycount += 1
+                        _inputiooffset += ammount
+                        inputobject.seek(_inputiooffset, io.SEEK_SET)
+                        break
                     raise
 
                 if (data == b'') or (ammount > size):
-                    return response.status, response.reason, dict(response.headers), inputbuffer
+                    return response.status, response.reason, dict(response.headers), sizeinfo, inputobject
 
-                inputbuffer.write(data)
+                inputobject.write(data)
 
             # if we are here then we should retry
             continue

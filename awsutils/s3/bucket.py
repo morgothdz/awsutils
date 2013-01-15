@@ -6,6 +6,7 @@
 
 from awsutils.s3.object import S3Object
 from awsutils.utils.wrappers import SimpleWindowedFileObjectReadWrapper
+from awsutils.client import AWSPartialReception
 
 class S3Bucket():
     def __init__(self, name, s3client,
@@ -32,7 +33,7 @@ class S3Bucket():
     def getObjects(self, delimiter=None, marker=None, prefix=None, _maxkeys=250):
         while True:
             data = self.s3client.getBucket(bucketname=self.name, delimiter=delimiter, marker=marker, prefix=prefix,
-                                           maxkeys=_maxkeys)
+                maxkeys=_maxkeys)
             if 'Contents' not in data:
                 break
             keys = data['Contents']
@@ -67,11 +68,11 @@ class S3Bucket():
         upload_id_marker = None
         while True:
             data = self.s3client.listMultipartUploads(bucketname=self.name,
-                                                      prefix=prefix,
-                                                      delimiter=delimiter,
-                                                      key_marker=key_marker,
-                                                      upload_id_marker=upload_id_marker,
-                                                      max_uploads=_maxuploads)
+                prefix=prefix,
+                delimiter=delimiter,
+                key_marker=key_marker,
+                upload_id_marker=upload_id_marker,
+                max_uploads=_maxuploads)
             if 'Upload' not in data:
                 break
             uploads = data['Upload']
@@ -84,7 +85,7 @@ class S3Bucket():
 
     def abortPendingMultipartUploads(self, prefix=None, delimiter=None):
         """
-        abort all or those selected by prefix and delimiter pending multipart uploads
+        abort all pending multipart uploads or only those selected by prefix and delimiter
         @param prefix: see s3 amazon doc for listMultipartUploads prefix parameter
         @type prefix: str
         @param delimiter: see s3 amazon doc for listMultipartUploads delimiter parameter
@@ -92,15 +93,16 @@ class S3Bucket():
         """
         for upload in self.getMultipartUploads(prefix=prefix, delimiter=delimiter):
             self.s3client.abortMultipartUpload(bucketname=self.name, objectname=upload['Key'],
-                                               uploadId=upload['UploadId'])
+                uploadId=upload['UploadId'])
 
-    def uploadArbitrarySizedObject(self, objectname, output, start=0, end=None, chunklen=5242880, hashcheck=False):
+    def uploadArbitrarySizedObject(self, objectname, outputobject, start=0, end=None, chunklen=5242880,
+                                   hashcheck=False):
         """
         upload a file like object of arbitrary length, uses multipart upload for files bigger than 2 x chunklen
         @param objectname: the name of the object in the s3 bucket
         @type objectname: str
-        @param output: file like object opened inr "rb" mode (must provide the read, seek and tell methods)
-        @param output: object
+        @param outputobject: file like object opened inr "rb" mode (must provide the read, seek and tell methods)
+        @param outputobject: object
         @param start: the start ofsset from where we upload the data
         @param start: int
         @param end: the last byte till we want to upload the data, if not provided means the end of the stream
@@ -113,12 +115,12 @@ class S3Bucket():
         if chunklen < 5242880:
             raise Exception("Your proposed upload is smaller than the minimum allowed (by amazon) size")
 
-        wrappedobj = SimpleWindowedFileObjectReadWrapper(obj=output, start=start, end=end, hashcheck=hashcheck)
+        wrappedobj = SimpleWindowedFileObjectReadWrapper(obj=outputobject, start=start, end=end, hashcheck=hashcheck)
 
-        #if file size bigger than given threshold (the minnimum allowed chunklength * 2) start process file as multipart
+        #if file size bigger than given threshold (the minimum allowed chunklength * 2) start process file as multipart
         if wrappedobj.size < chunklen * 2:
             result = self.s3client.putObject(bucketname=self.name, objectname=objectname, value=wrappedobj,
-                                             objlen=wrappedobj.size)
+                objlen=wrappedobj.size)
             #TODO: hashcheck
             return result
 
@@ -138,9 +140,9 @@ class S3Bucket():
                     break
 
                 result = self.s3client.uploadOjectPart(bucketname=self.name, objectname=objectname,
-                                                       partnumber=partnumber, uploadid=upload['UploadId'],
-                                                       value=wrappedobj,
-                                                       objlen=wrappedobj.size)
+                    partnumber=partnumber, uploadid=upload['UploadId'],
+                    value=wrappedobj,
+                    objlen=wrappedobj.size)
 
                 if hashcheck and result['ETag'][1:-1] != wrappedobj.getMd5HexDigest():
                     raise Exception('upload hash mismatch')
@@ -151,7 +153,7 @@ class S3Bucket():
                 start += tosendlen
 
             result = self.s3client.completeMultipartUpload(bucketname=self.name, objectname=objectname,
-                                                           uploadId=upload['UploadId'], parts=parts)
+                uploadId=upload['UploadId'], parts=parts)
             #TODO: global hashcheck
             print("completeMultipartUpload", result)
             print(wrappedobj.getGlobalMd5HexDigest())
@@ -160,17 +162,60 @@ class S3Bucket():
             self.s3client.abortMultipartUpload(bucketname=self.name, objectname=objectname, uploadId=upload['UploadId'])
 
 
-    def downloadArbitrarySizedObject(self, objectname, input=None):
+    def downloadArbitrarySizedObject(self, objectname, inputobject=None, hashcheck=False):
+        #THIS IS WORK IN PROGRESS
         """
-        download an object from s3 to a file like object
+        download an object from s3 to a file like object, it's capable to resume interrupted uploads
         @param objectname: the name of the object in the s3 bucket
         @type name: str
         @param output: file like object opened in "w+b" mode (must provide the write, seek and tell methods), if not
                        provided the data is returned in a tempfile.TemporaryFile
         @param output: object
+        @param hashcheck: the functions checks for the download data integrity using md5 hashes
+        @param hashcheck: bool
         """
-        #TODO: implement
-        pass
+        offset = 0
+        result = None
+        if inputobject is None:
+            inputobjectoffset = 0
+        else:
+            inputobjectoffset = inputobject.tell()
+
+        while True:
+            try:
+                result = self.s3client.getObject(bucketname=self.name, objectname=objectname, inputobject=inputobject, byterange =(offset,))
+                if inputobject is None:
+                    inputobject = result['data']
+                break
+
+            except AWSPartialReception as e:
+                print("partial crash", e)
+                if inputobject is None:
+                    inputobject = e.data
+                offset += e.sizeinfo['downloaded'] + 1
+                size = e.sizeinfo['size']
+                if offset >= size:
+                    break
+        """
+        print("result", result)
+
+
+        import io
+        inputobject.seek(0, io.SEEK_SET)
+        with open("result", "wb") as result:
+            while True:
+                o = inputobject.read(1024)
+                if o:
+                    result.write(o)
+                else:
+                    break
+        """
+
+
+
+
+
+
 
     def __repr__(self):
         return repr(self.__dict__)

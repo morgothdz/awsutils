@@ -100,7 +100,8 @@ class S3Client(AWSClient):
         #TODO: implement
         pass
 
-    def getObject(self, bucketname, objectname, inputbuffer=None,
+    def getObject(self, bucketname, objectname,
+                  inputobject=None,
                   byterange=None,
                   versionID=None, 
                   if_modified_since=None,
@@ -117,7 +118,10 @@ class S3Client(AWSClient):
         headers = {}
         statusexpected = [404, 200]
         if byterange is not None:
-            headers['Range'] = "bytes=%d-%d" % (byterange[0], byterange[1])
+            if len(byterange) > 1:
+                headers['Range'] = "bytes=%d-%d" % (byterange[0], byterange[1])
+            else:
+                headers['Range'] = "bytes=%d-" % (byterange[0],)
             statusexpected = [200, 206]
 
         if if_modified_since is not None:
@@ -142,20 +146,21 @@ class S3Client(AWSClient):
             path = '/' + objectname
             endpoint = bucketname + ".s3.amazonaws.com"
 
-        status, _reason, headers, data = self.request(method="HEAD" if _doHeadRequest else "GET",
-                                                      path=path,
-                                                      headers=headers,
-                                                      endpoint=endpoint,
-                                                      statusexpected=statusexpected,
-                                                      query=query,
-                                                      inputbuffer=inputbuffer,
-                                                      xmlexpected=False)
+        status, _reason, headers, range, data = self.request(method="HEAD" if _doHeadRequest else "GET",
+                                                             path=path,
+                                                             headers=headers,
+                                                             endpoint=endpoint,
+                                                             statusexpected=statusexpected,
+                                                             query=query,
+                                                             inputobject=inputobject,
+                                                             xmlexpected=False)
 
         result = dict((k, v) for k, v in headers.items() if k in ('ETag',
         'x-amz-delete-marker', 'x-amz-expiration', 'x-amz-server-side-encryption',
         'x-amz-restore', 'x-amz-version-id', 'x-amz-website-redirect-location')
         or k.startswith('x-amz-meta-'))
         result['status'] = status
+        result['range'] = range
         if status in (200, 206) and not _doHeadRequest:
             result['data'] = data
         return result
