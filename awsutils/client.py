@@ -74,6 +74,8 @@ def awsDate(now=time.gmtime()):
 
 class AWSClient:
     MAX_IN_MEMORY_READ_CHUNK_SIZE_FOR_RAW_DATA = 1024 * 1024
+    HTTP_CONNECTION_RETRY_NUMBER = 3
+    HTTP_RECEPTION_TIMEOUT = 30
 
     def __init__(self, host, access_key, secret_key, secure=False, tmpdir='.'):
         self.host = host
@@ -182,15 +184,18 @@ class AWSClient:
                 endpoint=None,
                 statusexpected=None,
                 xmlexpected=True,
-                retry=3,
                 inputobject=None,
                 operationtimeout=None,
-                receptiontimeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+                retry=None,
+                receptiontimeout=None,
+                _inputIOWrapper=None):
 
-        _redircount = 0
-        _retycount = 0
+        if retry is None: retry = self.HTTP_CONNECTION_RETRY_NUMBER
+        if receptiontimeout is None: receptiontimeout = self.HTTP_RECEPTION_TIMEOUT
+
+        _redirectcount = 0
+        _retrycount = 0
         _outputiooffset = None
-        _inputiooffset = None
 
         if headers is None: headers = {}
         if query is None: query = {}
@@ -202,7 +207,7 @@ class AWSClient:
             
             # if request body is an io like object ensure that we set the pointer back to the start before retrying
             if hasattr(body, 'reset'):
-                if _redircount > 0:
+                if _redirectcount > 0:
                     body.reset()
             else:
                 try:
@@ -212,13 +217,6 @@ class AWSClient:
                         body.seek(_outputiooffset, io.SEEK_SET)
                 except:
                     pass
-            
-            # same for the inputbuffer
-            try:
-                if _inputiooffset is None:
-                    _inputiooffset = inputobject.tell()
-            except:
-                pass
 
             print("Requesting", method, endpoint, path, headers, query)
 
@@ -242,8 +240,8 @@ class AWSClient:
                 conn.request(method=method, url=url, body=body, headers=headers)
                 response = conn.getresponse()
             except Exception as _e:
-                if _retycount < retry:
-                    _retycount += 1
+                if _retrycount < retry:
+                    _retrycount += 1
                     continue
                 raise
 
@@ -263,8 +261,8 @@ class AWSClient:
                         data = response.read(amt=32768)
                     except:
                         # TODO: not all exception should retry, maybe an exception white list would be the way to go
-                        if _retycount < retry:
-                            _retycount += 1
+                        if _retrycount < retry:
+                            _retrycount += 1
                             doretry = True
                             break
                         raise
@@ -281,8 +279,8 @@ class AWSClient:
                     try:
                         if data['Error']['Code'] in ('TemporaryRedirect', 'PermanentRedirect'):
                             redirect = data['Error']['Endpoint']
-                            if _redircount < 3:
-                                _redircount += 1
+                            if _redirectcount < 3:
+                                _redirectcount += 1
                                 endpoint = redirect
                                 continue
                     except:
@@ -298,7 +296,7 @@ class AWSClient:
                 #consume input
                 try:
                     data = response.read(1024)
-                    while response.read(1024) != b'':
+                    while response.read(32768) != b'':
                         pass
                 except Exception as e:
                     print(e)
@@ -326,11 +324,12 @@ class AWSClient:
                 sizeinfo = {'size':size, 'start' : 0, 'end':size - 1, 'downloaded':0}
 
             if inputobject is None:
-                _inputiooffset = 0
                 if size > self.MAX_IN_MEMORY_READ_CHUNK_SIZE_FOR_RAW_DATA:
                     inputobject = tempfile.TemporaryFile(mode="w+b", dir=self.tmpdir, prefix='awstmp-')
                 else:
                     inputobject = io.BytesIO()
+                if _inputIOWrapper is not None:
+                    inputobject = _inputIOWrapper(inputobject)
 
             ammount = 0
 
@@ -341,19 +340,18 @@ class AWSClient:
                         raise AWSTimeout('operation timeout')
                     data = response.read(32768)
                     ammount += len(data)
+                    #print(ammount, sizeinfo['size'])
 
                 except Exception as e:
 
                     if ammount > 0:
                         # don't loose partial data yet, it may be useful even in this situation
                         sizeinfo['downloaded'] = ammount
-                        raise AWSPartialReception(headers = dict(response.headers), data = inputobject, sizeinfo = sizeinfo, exception =e)
+                        raise AWSPartialReception(status = response.status, reason = response.reason, headers = dict(response.headers), data = inputobject, sizeinfo = sizeinfo, exception =e)
 
                     # TODO: not all exception should retry, maybe an exception white list would be the way to go
-                    if _retycount < retry:
-                        _retycount += 1
-                        _inputiooffset += ammount
-                        inputobject.seek(_inputiooffset, io.SEEK_SET)
+                    if _retrycount < retry:
+                        _retrycount += 1
                         break
                     raise
 

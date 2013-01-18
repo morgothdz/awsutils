@@ -6,6 +6,30 @@
 
 import os, io, hashlib
 
+class SimpleMd5FileObjectWriteWrapper:
+    def __init__(self, obj):
+        self.obj = obj
+        self.reset()
+    def write(self, data):
+        self.md5.update(data)
+        self.obj.write(data)
+    def tell(self):
+        self.obj.tell()
+    def seek(self, offset, whence=io.SEEK_SET):
+        #seeking will ruin the hash ...
+        self.md5invalid = True
+        self.obj.seek(offset, whence)
+    def close(self):
+        self.obj.close()
+    def reset(self):
+        self.md5invalid = False
+        self.md5 = hashlib.md5()
+    def getMd5Digest(self):
+        return self.md5.digest()
+    def getMd5HexDigest(self):
+        return self.md5.hexdigest()
+
+
 class SimpleWindowedFileObjectReadWrapper:
 
     def __init__(self, obj, start=0, end=None, mode="w+b", hashcheck = False):
@@ -16,11 +40,6 @@ class SimpleWindowedFileObjectReadWrapper:
         self.hashcheck = hashcheck
         if hashcheck:
             self.md5 = hashlib.md5()
-            """
-            TODO: globalmd5 not working
-            """
-            self.globalmd5 = hashlib.md5()
-            self.globalmd5clone = self.globalmd5.copy()
 
         if end is None:
             if hasattr(obj, 'end'):
@@ -50,7 +69,7 @@ class SimpleWindowedFileObjectReadWrapper:
     def resetBoundaries(self, start=None, end=None):
         if start is not None and start != self.start:
             self.start = start
-            obj.seek(self.start, io.SEEK_SET)
+            self.obj.seek(self.start, io.SEEK_SET)
         if self.hashcheck:
             self.md5 = hashlib.md5()
 
@@ -63,10 +82,8 @@ class SimpleWindowedFileObjectReadWrapper:
     def reset(self):
         if self.hashcheck:
             self.md5 = hashlib.md5()
-            self.globalmd5 = self.globalmd5clone
-            self.globalmd5clone = self.globalmd5.copy()
         self.readed = 0
-        obj.seek(self.start, io.SEEK_SET)
+        self.obj.seek(self.start, io.SEEK_SET)
 
     def read(self, size=99999999999999999999):
         size = min(size, self.size - self.readed)
@@ -76,7 +93,6 @@ class SimpleWindowedFileObjectReadWrapper:
             if l > 0:
                 if self.hashcheck:
                     self.md5.update(data)
-                    self.globalmd5.update(data)
                 self.readed += len(data)
             return data
         return b""
@@ -88,7 +104,3 @@ class SimpleWindowedFileObjectReadWrapper:
     def getMd5HexDigest(self):
         if self.hashcheck:
             return self.md5.hexdigest()
-
-    def getGlobalMd5HexDigest(self):
-        if self.hashcheck:
-            return self.globalmd5.hexdigest()

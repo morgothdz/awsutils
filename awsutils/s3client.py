@@ -10,6 +10,12 @@ from awsutils.client import AWSClient
 class S3Exception(Exception):
     pass
 
+class S3HashCheckException(Exception):
+    pass
+
+class S3IntegrityException(Exception):
+    pass
+
 
 class S3Client(AWSClient):
     #==================================== operations on the service =======================================
@@ -106,7 +112,8 @@ class S3Client(AWSClient):
                   versionID=None, 
                   if_modified_since=None,
                   if_unmodified_since=None, if_match=None, if_none_match=None, 
-                  _doHeadRequest=False):
+                  _doHeadRequest=False,
+                  _inputIOWrapper=None):
         """
         range = list(start, end)
         inputbuffer = be any object implementing write(bytes)
@@ -153,7 +160,8 @@ class S3Client(AWSClient):
                                                              statusexpected=statusexpected,
                                                              query=query,
                                                              inputobject=inputobject,
-                                                             xmlexpected=False)
+                                                             xmlexpected=False,
+                                                             _inputIOWrapper=_inputIOWrapper)
 
         result = dict((k, v) for k, v in headers.items() if k in ('ETag',
         'x-amz-delete-marker', 'x-amz-expiration', 'x-amz-server-side-encryption',
