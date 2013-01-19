@@ -4,7 +4,7 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-import binascii, base64
+import binascii, base64, json
 from awsutils.client import AWSClient
 
 class S3Exception(Exception):
@@ -18,6 +18,16 @@ class S3IntegrityException(Exception):
 
 
 class S3Client(AWSClient):
+
+    def _buketname2PathAndEndpoint(self, bucketname):
+        if bucketname != bucketname.lower():
+            path = "/" + bucketname + "/"
+            endpoint = None
+        else:
+            path = '/'
+            endpoint = bucketname + ".s3.amazonaws.com"
+        return path, endpoint
+
     #==================================== operations on the service =======================================
     def getService(self):
         _status, _reason, _headers, data = self.request(method='GET', path='/')
@@ -27,36 +37,70 @@ class S3Client(AWSClient):
 
     #==================================== operations on the buckets =======================================
 
-    def getBucketlocation(self, bucketname):
-        if bucketname != bucketname.lower():
-            path = "/" + bucketname + "/"
-            endpoint = None
-        else:
-            path = '/'
-            endpoint = bucketname + ".s3.amazonaws.com"
-        _status, _reason, _headers, data = self.request(method="GET", path=path, endpoint=endpoint,
-                                                        query={'location': None})
-        location = data['LocationConstraint']
-        if location == '':
-            location = 'us-standard'
-        return location
+    def deleteBucket(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        self.request(method="DELETE", path=path, endpoint=endpoint, statusexpected=[204])
+
+    def deleteBucketCors(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        self.request(method="DELETE", path=path, endpoint=endpoint, statusexpected=[204], query={'cors': None})
+
+    def deleteBucketLifecycle(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        self.request(method="DELETE", path=path, endpoint=endpoint, statusexpected=[204], query={'lifecycle': None})
+
+    def deleteBucketPolicy(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        self.request(method="DELETE", path=path, endpoint=endpoint, statusexpected=[204], query={'policy ': None})
+
+    def deleteBucketTagging(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        self.request(method="DELETE", path=path, endpoint=endpoint, statusexpected=[204], query={'tagging': None})
+
+    def deleteBucketWebsite(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        self.request(method="DELETE", path=path, endpoint=endpoint, statusexpected=[204], query={'website': None})
 
     def getBucket(self, bucketname, delimiter=None, marker=None, prefix=None, maxkeys=None):
+        """
+        List Objects
+        """
         query = {}
         if delimiter is not None: query['delimiter'] = delimiter
         if prefix is not None: query['prefix'] = prefix
         if marker is not None: query['marker'] = marker
         if maxkeys is not None: query['max-keys'] = maxkeys
-
-        if bucketname != bucketname.lower():
-            path = "/" + bucketname + "/"
-            endpoint = None
-        else:
-            path = '/'
-            endpoint = bucketname + ".s3.amazonaws.com"
-
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
         _status, _reason, _headers, data = self.request(method="GET", path=path, endpoint=endpoint, query=query)
         return data['ListBucketResult']
+
+    def getBucketAcl(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        _status, _reason, _headers, data = self.request(method="GET", path=path, endpoint=endpoint, query={'acl':None})
+        return data['AccessControlPolicy']
+
+    def getBucketCors(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        _status, _reason, _headers, data = self.request(method="GET", path=path, endpoint=endpoint, query={'cors':None})
+        return data['CORSConfiguration']
+
+    def getBucketLifecycle(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        _status, _reason, _headers, data = self.request(method="GET", path=path, endpoint=endpoint, query={'lifecycle':None})
+        return data['LifecycleConfiguration']
+
+    def getBucketPolicy(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        _status, _reason, _headers, data = self.request(method="GET", path=path, endpoint=endpoint, query={'policy':None})
+        return data['LifecycleConfiguration']
+
+    def getBucketLocation(self, bucketname):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        _status, _reason, _headers, data = self.request(method="GET", path=path, endpoint=endpoint, query={'location': None})
+        location = data['LocationConstraint']
+        if location == '':
+            location = 'us-standard'
+        return location
 
     def listMultipartUploads(self, bucketname, delimiter=None, max_uploads=None, key_marker=None, prefix=None, upload_id_marker=None):
         query = {'uploads':None}
@@ -73,6 +117,13 @@ class S3Client(AWSClient):
             endpoint = bucketname + ".s3.amazonaws.com"
         _status, _reason, _headers, data = self.request(method="GET", path=path, endpoint=endpoint, query=query)
         return data['ListMultipartUploadsResult']
+
+    def putBucketPolicy(self, bucketname, policy):
+        path, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        if isinstance(policy, dict):
+            policy = json.dumps(policy)
+        _status, _reason, _headers, data = self.request(method="PUT", path=path, body = policy, endpoint=endpoint,
+                                                        statusexpected=[204], query={'policy': None})
 
 
 
