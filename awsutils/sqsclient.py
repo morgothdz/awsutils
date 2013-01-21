@@ -5,21 +5,39 @@
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 from awsutils.client import AWSClient
+from awsutils.utils.auth import SIGNATURE_V4_HEADERS
 
 class SQSClient(AWSClient):
-    def ListQueues(self, queueNamePrefix=None):
+
+    def _getRegion(self):
+        try:
+            return self.__region
+        except:
+            self.__region = self.host[4:-14]
+            return self.__region
+
+    def listQueues(self, queueNamePrefix=None):
         query = {'Action':'ListQueues', 'Version':'2012-11-05'}
-        """
-        http://sqs.us-east-1.amazonaws.com/
-?Action=ListQueues
-&QueueNamePrefix=t
-&Version=2009-02-01
-&SignatureMethod=HmacSHA256
-&Expires=2009-04-18T22%3A52%3A43PST
-&AWSAccessKeyId=AKIAIOSFODNN7EXAMPLE
-&SignatureVersion=2
-&Signature=Dqlp3Sd6ljTUA9Uf6SGtEExwUQEXAMPLE
-        """
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
+                                                        region=self._getRegion(), service='sqs')
+        result = []
+        data = data['ListQueuesResponse']['ListQueuesResult']
+        if 'QueueUrl' in data:
+            result = data['QueueUrl']
+            if not isinstance(result, list):
+                result = [result]
+        return result
+
+    def getQueueUrl(self, queueName, queueOwnerAWSAccountId=None):
+        query = {'Action':'GetQueueUrl', 'QueueName':queueName, 'Version':'2012-11-05'}
+        if queueOwnerAWSAccountId is not None:
+            query['QueueOwnerAWSAccountId'] = queueOwnerAWSAccountId
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
+                                                        region=self._getRegion(), service='sqs')
+        data = data['GetQueueUrlResponse']['GetQueueUrlResult']
+        if 'QueueUrl' in data:
+            return data['QueueUrl']
+        return None
 
     def receiveMessage(self, attributes=None, maxNumberOfMessages=None, visibilityTimeout=None, waitTimeSeconds=None):
         """

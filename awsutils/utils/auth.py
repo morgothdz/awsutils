@@ -21,6 +21,16 @@ URLENCODE_SAFE = frozenset(b'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 URLENCODE_SAFE_BYTES = bytes(URLENCODE_SAFE)
 
+SIGNATURE_V2 = 0
+SIGNATURE_V4 = 1
+SIGNATURE_V4_HEADERS = 2
+SIGNATURE_S3_REST = 3
+
+S3_ENDPOINTS = {"s3.amazonaws.com", "s3-us-west-1.amazonaws.com",
+                "s3-us-west-2.amazonaws.com", "s3-eu-west-1.amazonaws.com",
+                "s3-ap-southeast-1.amazonaws.com", "s3-ap-southeast-2.amazonaws.com",
+                "s3-ap-northeast-1.amazonaws.com", "s3.sa-east-1.amazonaws.com"}
+
 def awsDate(date=time.gmtime()):
     return ('%s, %02d %s %04d %02d:%02d:%02d GMT' % (('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')[date.tm_wday],
                                                      date.tm_mday,
@@ -186,16 +196,17 @@ def calculateV4Signature(secret_key, region, service, date=time.gmtime(), uri='/
     return signature
 
 
-def signRequest(access_key, secret_key, host, region=None, service=None, signingmethod=None, date=time.gmtime(),
+def signRequest(access_key, secret_key, host, region=None, service=None,
+                signmethod=None, date=time.gmtime(),
                 uri='/', method='GET', headers=None,
                 query=None, body=b'', expires=None):
-    #signingmethod v2, v4, v4headers
+    #signmethod v2, v4, v4headers
     date = time.gmtime()
     if headers is None: headers = {}
     headers['Host'] = host
     headers['Date'] = getISO8601dashedTime(date)
 
-    if signingmethod == 'v2':
+    if signmethod == SIGNATURE_V2:
         if query is None: query = {}
         query['AWSAccessKeyId'] = access_key
         query['SignatureVersion'] = 2
@@ -206,7 +217,7 @@ def signRequest(access_key, secret_key, host, region=None, service=None, signing
             query['Timestamp'] = getISO8601Time(date)
         signature = calculateV2Signature(secret_key, date, uri, method, headers, query, body)
         query['Signature'] = signature
-    elif signingmethod == 'v4':
+    elif signmethod == SIGNATURE_V4:
         if query is None: query = {}
         query['X-Amz-Date'] = getISO8601Time(date)
         query['X-Amz-Algorithm'] = 'AWS4-HMAC-SHA256'
@@ -214,7 +225,7 @@ def signRequest(access_key, secret_key, host, region=None, service=None, signing
         query['X-Amz-SignedHeaders'] = canonicalHeaderNames(headers)
         signature = calculateV4Signature(secret_key, region, service, date, uri, method, headers, query, body)
         query['X-Amz-Signature'] = signature
-    elif signingmethod == 'v4headers':
+    elif signmethod == SIGNATURE_V4_HEADERS:
         signature = calculateV4Signature(secret_key, region, service, date, uri, method, headers, query, body)
         authorization = ['AWS4-HMAC-SHA256 Credential=',
                          getAmzCredential(access_key, region, service, date),
@@ -223,11 +234,17 @@ def signRequest(access_key, secret_key, host, region=None, service=None, signing
                          ', Signature=',
                          signature]
         headers['Authorization'] = ''.join(authorization)
-    elif signingmethod == 's3rest':
+    elif signmethod == SIGNATURE_S3_REST:
+        uriprefix = None
+        for region in S3_ENDPOINTS:
+            if host[1:].endswith(region):
+                uriprefix = host[0:- (len(region) + 1)]
+                break
+        if uriprefix is not None:
+            uri = '/' + uriprefix + uri
         headers['Date'] = awsDate(date)
         canonicalRequest = canonicalRequestS3Rest(method=method, uri=uri, headers=headers, query=query,
-            expires=expires)
-        print(canonicalRequest)
+                                                  expires=expires)
         headers["Authorization"] = 'AWS %s:%s' % (
             access_key,
             base64.b64encode(HMAC_SHA1(secret_key, canonicalRequest, hexdigest=False)).strip().decode())

@@ -7,7 +7,6 @@
 import time, hmac, hashlib, io, base64, socket, tempfile
 import http.client
 import xml.sax
-import boto.route53.hostedzone
 
 try:
     from select import poll as select_poll
@@ -126,9 +125,11 @@ class AWSClient:
         self.connections[destination] = conn
         return conn
 
-    def request(self, method='GET', host=None, path='/', headers=None, query=None, body=None,
+    def request(self, method='GET', host=None, uri='/', headers=None, query=None, body=b'',
                 region= None, service=None,
-                signingmethod = None,
+                expires=None,
+                date=time.gmtime(),
+                signmethod = None,
                 statusexpected=None,
                 xmlexpected=True,
                 inputobject=None,
@@ -165,28 +166,20 @@ class AWSClient:
                 except:
                     pass
 
-            print("Requesting", method, host, path, headers, query)
+            print("Requesting", method, host, uri, headers, query)
 
             if query != {}:
-                url = "%s?%s" % (path, authutils.canonicalQueryString(query))
+                url = "%s?%s" % (uri, authutils.canonicalQueryString(query))
             else:
-                url = path
+                url = uri
 
-            conn = self.getConnection(destination=headers['Host'], timeout=receptiontimeout)
+            conn = self.getConnection(destination=host, timeout=receptiontimeout)
 
             headers, query, body = authutils.signRequest(access_key=self.access_key, secret_key=self.secret_key,
                                                          host=host, region=region, service=service,
-                                                         signingmethod=signingmethod, date=time.gmtime(),
-                                                         uri=path, method='GET', headers=None,
-                                                         query=None, body=b'', expires=None
-
-                self.access_key, self.secret_key, host,
-                w
-                                                         host, region=region, service=None, signingmethod='s3rest', date=time.gmtime(),
-                uri="/%s%s" % (virtualhostedsubdomain, path), method=method, headers=headers,
-                query=query, body=b'', expires=expires)
-
-            #self.prepareHeaders(method, path, headers, query, virtualhostedsubdomain=virtualhostedsubdomain, endpoint=endpoint)
+                                                         signmethod=signmethod, date=date,
+                                                         uri=uri, method=method, headers=headers,
+                                                         query=query, body=body, expires=expires)
 
             try:
                 conn.request(method=method, url=url, body=body, headers=headers)
@@ -199,8 +192,8 @@ class AWSClient:
 
             data = None
 
-            if xmlexpected or (
-                'Content-Type' in response.headers and response.headers['Content-Type'] == 'application/xml'):
+            if xmlexpected or ('Content-Type' in response.headers and
+                               response.headers['Content-Type'] == 'application/xml'):
                 handler = AWSXMLHandler()
                 incr_parser = xml.sax.make_parser()
                 incr_parser.setContentHandler(handler)
@@ -229,8 +222,8 @@ class AWSClient:
 
                 if 300 <= response.status < 400:
                     try:
-                        if data['Error']['Code'] in ('TemporaryRedirect', 'PermanentRedirect'):
-                            redirect = data['Error']['Endpoint']
+                        if awsresponse['Error']['Code'] in ('TemporaryRedirect', 'PermanentRedirect'):
+                            redirect = awsresponse['Error']['Endpoint']
                             if _redirectcount < 3:
                                 _redirectcount += 1
                                 host = redirect
