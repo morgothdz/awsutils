@@ -7,8 +7,7 @@
 import time, hmac, hashlib, io, base64, socket, tempfile
 import http.client
 import xml.sax
-from collections import OrderedDict
-from urllib.parse import quote_plus as urllib_parse_quote_plus
+import boto.route53.hostedzone
 
 try:
     from select import poll as select_poll
@@ -19,6 +18,8 @@ except ImportError:  # Doesn't exist on OSX and other platforms
     select_poll = False
 
 from awsutils.utils.xmlhandler import AWSXMLHandler
+import awsutils.utils.auth as authutils
+
 
 class AWSException(Exception):
     """exceptions raised on amazon error responses"""
@@ -62,28 +63,8 @@ class AWSPartialReception(Exception):
         self.exception = exception
 
     def __repr__(self):
-        return "AWSPartialReception [%d]" % (self.size,)
+        return "AWSPartialReception [%d]" % (self.sizeinfo,)
 
-qsa_of_interest = {'acl', 'cors', 'defaultObjectAcl', 'location', 'logging',
-                   'partNumber', 'policy', 'requestPayment', 'torrent',
-                   'versioning', 'versionId', 'versions', 'website',
-                   'uploads', 'uploadId', 'response-content-type',
-                   'response-content-language', 'response-expires',
-                   'response-cache-control', 'response-content-disposition',
-                   'response-content-encoding', 'delete', 'lifecycle'}
-
-_ALWAYS_SAFE = frozenset(b'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-                         b'abcdefghijklmnopqrstuvwxyz'
-                         b'0123456789'
-                         b'_.-+')
-_ALWAYS_SAFE_BYTES = bytes(_ALWAYS_SAFE)
-
-def awsDate(now=time.gmtime()):
-    return ('%s, %02d %s %04d %02d:%02d:%02d GMT' % (('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')[now.tm_wday],
-                                                     now.tm_mday,
-                                                     ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-                                                      'Oct', 'Nov', 'Dec')[now.tm_mon - 1],
-                                                     now.tm_year, now.tm_hour, now.tm_min, now.tm_sec))
 
 
 class AWSClient:
@@ -99,160 +80,24 @@ class AWSClient:
         self.connections = {}
         self.tmpdir = tmpdir
 
-    @classmethod
-    def urlquote(cls, string):
-        """
-        Do not URL-encode any of the unreserved characters that RFC 3986 defines: A-Z, a-z, 0-9, hyphen ( - ), underscore ( _ ), period ( . ), and tilde ( ~ ).
-        Percent-encode all other characters with %XY, where X and Y are hexadecimal characters (0-9 and uppercase A-F).
-        Percent-encode extended UTF-8 characters in the form %XY%ZA....
-        Percent-encode the space character as %20 (and not '+', as some encoding schemes do).
-        """
-        return ''.join([chr(char) if char in _ALWAYS_SAFE_BYTES else '%{:02X}'.format(b) for char in
-                        string.encode('utf-8', 'strict')])
+    def test(self):
+        date = time.gmtime()
+        headers, query, body = authutils.signRequest(self.access_key, self.secret_key, host='sqs.us-east-1.amazonaws.com', region='us-east-1', service='sqs', signingmethod='v4headers', date= date,
+            query={'Action': 'ListQueues'})
 
-    @classmethod
-    def canonicalQueryString(cls, query, whitelist=None):
-        _query = sorted(query.items())
-        result = []
-        for item in _query:
-            if whitelist is not None:
-                if item[0] not in whitelist:
-                    continue
-            value = item[1]
-            if value is not None:
-                if not isinstance(value, str):
-                    value = "%s" % (value,)
-                result.append(cls.urlquote(item[0]) + '=' + cls.urlquote(value))
-            else:
-                result.append(cls.urlquote(item[0]))
-        return "&".join(result)
-
-    @classmethod
-    def canonicalHeaders(cls, headers):
-        _headers = []
-        for key in headers:
-            _headers[key.lower()] = headers[key].strip()
-        _headers = sorted(_headers.items())
-        result = []
-        for item in sorted_headers:
-            result.append("%s:%s" % (item[0], item[1]))
-        return "\n".join(result), ';'.join([item[0].lower() for item in _headers])
-
-    @classmethod
-    def canonicalRequest(cls, method='GET', uri='/', headers=None, query=None, expires=None):
-        interesting_headers = {}
-        if headers is not None:
-            for key in headers:
-                lk = key.lower()
-                if headers[key] is not None and (
-                lk in ('content-md5', 'content-type', 'date') or lk.startswith('x-amz-')):
-                    interesting_headers[lk] = headers[key].strip()
-        if 'content-type' not in interesting_headers: interesting_headers['content-type'] = ''
-        if 'content-md5' not in interesting_headers: interesting_headers['content-md5'] = ''
-        if expires is not None: interesting_headers['date'] = expires
-        sorted_header_keys = sorted(interesting_headers)
-        result = [method]
-        for key in sorted_header_keys:
-            val = interesting_headers[key]
-            if key.startswith('x-amz-'):
-                result.append("%s:%s" % (key, val))
-            else:
-                result.append(val)
-
-        cqs = cls.canonicalQueryString(query, whitelist=qsa_of_interest)
-        if len(cqs) > 0:
-            result.append("%s?%s" % (uri, cqs))
-        else:
-            result.append(uri)
-
-        return "\n".join(result)
-
-    @classmethod
-    def canonicalRequestV4(cls, method='GET', uri='/', headers=None, query=None, body=b''):
-        cheaders, signedheaders = cls.canonicalHeaders(headers)
-        sha256 = hashlib.sha256()
-        sha256.update(body)
-        result = [method, uri, cls.canonicalQueryString(query), cheaders, signedheaders, sha256.hexdigest()]
-        return "\n".join(result)
-
-    def calculateV4Signature(self, date=time.gmtime(), uri='/', method='GET', headers=None, query=None, body=b''):
-        simpledate = '%04d%02d%02d'%(date.tm_year, date.tm_mon, date.tm_mday)
-        kDate = HMAC("AWS4" + self.secret_key, simpledate)
-        kRegion = HMAC(kDate, self.region)
-        kService = HMAC(kRegion, self.service)
-        kSigning = HMAC(kService, "aws4_request")
-
-        requestDate = '%04d%02d%02dT%02d%02%02Z'%(date.tm_year, date.tm_mon, date.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
-        credentialsScope = '/'.join([simpledate, self.region, self.service, 'aws4_request'])
-
-        sha256 = hashlib.sha256()
-        sha256.update(self.canonicalRequestV4(uri='/', method='GET', headers=None, query=None, body=b''))
-        hashCanonicalRequest = sha256.hexdigest()
-
-        stringToSign = ['AWS4-HMAC-SHA256', requestDate, credentialsScope, hashCanonicalRequest]
-        stringToSign = "\n".join(stringToSign)
-
-        signature = HMAC(kSigning, stringToSign)
-        return signature
-
-        """
-        
-        """
-
-    def prepareHeaders(self, method, path, headers=None, query=None, expires=None, date=awsDate(),
-                       virtualhostedsubdomain=None):
-        if headers is None: headers = {}
-        if query is None: query = {}
-
-        if virtualhostedsubdomain is not None: path = "/%s%s" % (virtualhostedsubdomain, path)
-
-        headers["Date"] = date
-        interesting_headers = {}
-
-        for key in headers:
-            lk = key.lower()
-            if headers[key] is not None and (lk in ('content-md5', 'content-type', 'date') or lk.startswith('x-amz-')):
-                interesting_headers[lk] = headers[key].strip()
-
-        # these keys get empty strings if they don't exist
-        if 'content-type' not in interesting_headers:
-            interesting_headers['content-type'] = ''
-        if 'content-md5' not in interesting_headers:
-            interesting_headers['content-md5'] = ''
-
-        # if you're using expires for query string auth, then it trumps date (and provider.date_header)
-        if expires: interesting_headers['date'] = expires
-
-        sorted_header_keys = sorted(interesting_headers)
-
-        buf = [method]
-        for key in sorted_header_keys:
-            val = interesting_headers[key]
-            if key.startswith('x-amz-'):
-                buf.append("%s:%s" % (key, val))
-            else:
-                buf.append(val)
-
-        cqs = self.canonicalQueryString(query, whitelist=qsa_of_interest)
-        if len(cqs) > 0:
-            buf.append("%s?%s" % (path, cqs))
-        else:
-            buf.append(path)
-
-        buffer = "\n".join(buf).encode()
-        #print("HMAC", buffer)
-        _hmac = hmac.new(self.secret_key.encode(), digestmod=hashlib.sha1)
-        _hmac.update(buffer)
-        headers["Authorization"] = 'AWS %s:%s' % (self.access_key, base64.b64encode(_hmac.digest()).strip().decode())
-
-        return headers
+        conn = self.getConnection(destination=headers['Host'])
+        conn.request(method='GET', url="/?" + authutils.canonicalQueryString(query), headers=headers)
+        response = conn.getresponse()
+        r = response.read()
+        print(r)
 
     def is_connection_usable(self, httpconnection):
         sock = httpconnection.sock
         if sock is None:
             return False
-            # if we have to read that means either that the connection was dropped, or that we have input data and that is not a good thing in this scenario
-        if select_poll == False:
+            # if we have to read that means either that the connection was dropped, or that we have input data and that
+            # is not a good thing in this scenario
+        if not select_poll:
             return select([sock], [], [], 0.0)[0] == []
         p = select_poll()
         p.register(sock, select_POLLIN)
@@ -281,8 +126,9 @@ class AWSClient:
         self.connections[destination] = conn
         return conn
 
-    def request(self, method='GET', path='/', headers=None, query=None, body=None,
-                endpoint=None,
+    def request(self, method='GET', host=None, path='/', headers=None, query=None, body=None,
+                region= None, service=None,
+                signingmethod = None,
                 statusexpected=None,
                 xmlexpected=True,
                 inputobject=None,
@@ -290,8 +136,10 @@ class AWSClient:
                 retry=None,
                 receptiontimeout=None,
                 _inputIOWrapper=None):
+
         if retry is None: retry = self.HTTP_CONNECTION_RETRY_NUMBER
         if receptiontimeout is None: receptiontimeout = self.HTTP_RECEPTION_TIMEOUT
+        if host is None: host=self.host
 
         _redirectcount = 0
         _retrycount = 0
@@ -317,23 +165,28 @@ class AWSClient:
                 except:
                     pass
 
-            print("Requesting", method, endpoint, path, headers, query)
-
-            virtualhostedsubdomain = None
-            if endpoint is None:
-                headers['Host'] = self.host
-            else:
-                headers['Host'] = endpoint
-                virtualhostedsubdomain = endpoint.split('.', 2)[0]
+            print("Requesting", method, host, path, headers, query)
 
             if query != {}:
-                url = "%s?%s" % (path, AWSClient.canonicalQueryString(query))
+                url = "%s?%s" % (path, authutils.canonicalQueryString(query))
             else:
                 url = path
 
             conn = self.getConnection(destination=headers['Host'], timeout=receptiontimeout)
 
-            self.prepareHeaders(method, path, headers, query, virtualhostedsubdomain=virtualhostedsubdomain)
+            headers, query, body = authutils.signRequest(access_key=self.access_key, secret_key=self.secret_key,
+                                                         host=host, region=region, service=service,
+                                                         signingmethod=signingmethod, date=time.gmtime(),
+                                                         uri=path, method='GET', headers=None,
+                                                         query=None, body=b'', expires=None
+
+                self.access_key, self.secret_key, host,
+                w
+                                                         host, region=region, service=None, signingmethod='s3rest', date=time.gmtime(),
+                uri="/%s%s" % (virtualhostedsubdomain, path), method=method, headers=headers,
+                query=query, body=b'', expires=expires)
+
+            #self.prepareHeaders(method, path, headers, query, virtualhostedsubdomain=virtualhostedsubdomain, endpoint=endpoint)
 
             try:
                 conn.request(method=method, url=url, body=body, headers=headers)
@@ -347,7 +200,7 @@ class AWSClient:
             data = None
 
             if xmlexpected or (
-            'Content-Type' in response.headers and response.headers['Content-Type'] == 'application/xml'):
+                'Content-Type' in response.headers and response.headers['Content-Type'] == 'application/xml'):
                 handler = AWSXMLHandler()
                 incr_parser = xml.sax.make_parser()
                 incr_parser.setContentHandler(handler)
@@ -380,7 +233,7 @@ class AWSClient:
                             redirect = data['Error']['Endpoint']
                             if _redirectcount < 3:
                                 _redirectcount += 1
-                                endpoint = redirect
+                                host = redirect
                                 continue
                     except:
                         pass
@@ -403,16 +256,11 @@ class AWSClient:
                 if response.status not in statusexpected:
                     #TODO: maybe we should retry on some status?
                     raise AWSDataException('unexpected status', response.status, response.reason,
-                                           dict(response.headers), data)
+                        dict(response.headers), data)
 
                 if 'Content-Length' not in response.headers:
                     raise AWSDataException('missing content length', response.status, response.reason,
-                                           dict(response.headers), data)
-                    """
-                    size = len(data)
-                    sizeinfo = {'size':size, 'start' : 0, 'end':size - 1, 'downloaded':0}
-                    return response.status, response.reason, dict(response.headers), sizeinfo, data
-                    """
+                        dict(response.headers), data)
 
             #if we are here then most probably we want to download some data
             size = int(response.headers['Content-Length'])
@@ -447,8 +295,8 @@ class AWSClient:
                         # don't loose partial data yet, it may be useful even in this situation
                         sizeinfo['downloaded'] = ammount
                         raise AWSPartialReception(status=response.status, reason=response.reason,
-                                                  headers=dict(response.headers), data=inputobject, sizeinfo=sizeinfo,
-                                                  exception=e)
+                            headers=dict(response.headers), data=inputobject, sizeinfo=sizeinfo,
+                            exception=e)
 
                     # TODO: not all exception should retry, maybe an exception white list would be the way to go
                     if _retrycount < retry:
