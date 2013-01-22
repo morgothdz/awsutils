@@ -1,4 +1,8 @@
-
+# awsutils/sdbclient.py
+# Copyright 2013 Attila Gerendi
+#
+# This module is part of awsutils and is released under
+# the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 from awsutils.client import AWSClient
 from awsutils.utils.auth import SIGNATURE_V2
@@ -10,6 +14,59 @@ class SimpleDBClient(AWSClient):
     def __init__(self, endpoint, access_key, secret_key, secure=False):
         self.boxUssage = 0
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
+
+    def batchDeleteAttributes(self, domainName, items, endpoint=None):
+        """
+        items example {"someItemname" :
+                                    {"someattributename" : "somevalue",
+                                    "someotherattributename" : "somevalue"
+                                     }
+                        "someotherItemname":{"someattributename" : "somevalue"}
+                        }
+        """
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'BatchDeleteAttributes', 'DomainName':domainName, 'Version': '2009-04-15'}
+        i = 1
+        for itemName in items:
+            query['Item.%d.ItemName'%(i,)] = itemName
+            a = 1
+            for attributeName in items[itemName]:
+                query['Item.%d.Attribute.%d.name'%(i,a)] = attributeName
+                query['Item.%d.Attribute.%d.value'%(i,a)] = items[itemName][attributeName]
+                a += 1
+            i += 1
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['BatchDeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        self.boxUssage += boxUsage
+
+    def batchPutAttributes(self, domainName, items, endpoint=None):
+        """
+        items example {"someItemname" :
+                                    {"someattributename" : "somevalue"
+                                     "someotherattributename" : ("somevalue", True) => if we want the attribute to be overwritten
+                                     }
+                        "someotherItemname":{"someattributename" : "somevalue"}
+                        }
+        """
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'BatchPutAttributes', 'DomainName':domainName, 'Version': '2009-04-15'}
+        i = 1
+        for itemName in items:
+            query['Item.%d.ItemName'%(i,)] = itemName
+            a = 1
+            for attributeName in items[itemName]:
+                query['Item.%d.Attribute.%d.name'%(i,a)] = attributeName
+                v = items[itemName][attributeName]
+                if isinstance(v, list):
+                    query['Item.%d.Attribute.%d.value'%(i,a)] = v[0]
+                    query['Item.%d.Attribute.%d.replace'%(i,a)] = v[1]
+                else:
+                    query['Item.%d.Attribute.%d.value'%(i,a)] = v
+                a += 1
+            i += 1
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['BatchPutAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        self.boxUssage += boxUsage
 
     def createDomain(self, domainName, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
@@ -24,6 +81,14 @@ class SimpleDBClient(AWSClient):
         _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
         boxUsage = float(data['DeleteDomainResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
+
+    def domainMetadata(self, domainName, endpoint=None):
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'DomainMetadata', 'DomainName':domainName, 'Version': '2009-04-15'}
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['DomainMetadataResponse']['ResponseMetadata']['BoxUsage'])
+        self.boxUssage += boxUsage
+        return data['DomainMetadataResponse']['DomainMetadataResult']
 
     def listDomains(self, maxNumberOfDomains=None, nextToken=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
@@ -57,5 +122,61 @@ class SimpleDBClient(AWSClient):
         self.boxUssage += boxUsage
         data = data['SelectResponse']['SelectResult']
         if isinstance(data, str): return []
+        data = data['Item']
         if isinstance(data, dict): return [data]
         return data
+
+    def getAttributes(self, domainName, itemName, attributeName=None, consistentRead=None, endpoint=None):
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'GetAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': '2009-04-15'}
+        if attributeName is not None:
+            query['AttributeName'] = attributeName
+        if consistentRead is not None:
+            query['ConsistentRead'] = consistentRead
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['GetAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        data = data['GetAttributesResponse']['GetAttributesResult']
+        if isinstance(data, str):
+            return None
+        data = data['Attribute']
+        if isinstance(data, dict): return [data]
+        return data
+
+    def putAttributes(self, domainName, itemName, attributes, expected=None, endpoint=None):
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'PutAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': '2009-04-15'}
+        i = 1
+        for name in attributes:
+            query['Attribute.%d.Name'%(i,)] = name
+            query['Attribute.%d.Value'%(i,)] = attributes[name]
+            i += 1
+        if expected is not None:
+            i = 1
+            for name in expected:
+                query['Expected.%d.Name'%(i,)] = name
+                query['Expected.%d.Value'%(i,)] = expected[name][0]
+                query['Expected.%d.Exists'%(i,)] = expected[name][1]
+                i += 1
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['PutAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        self.boxUssage += boxUsage
+
+
+    def deleteAttributes(self, domainName, itemName, attributes, expected=None, endpoint=None):
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'DeleteAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': '2009-04-15'}
+        i = 1
+        for name in attributes:
+            query['Attribute.%d.Name'%(i,)] = name
+            query['Attribute.%d.Value'%(i,)] = attributes[name]
+            i += 1
+        if expected is not None:
+            i = 1
+            for name in expected:
+                query['Expected.%d.Name'%(i,)] = name
+                query['Expected.%d.Value'%(i,)] = expected[name][0]
+                query['Expected.%d.Exists'%(i,)] = expected[name][1]
+                i += 1
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['DeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        self.boxUssage += boxUsage
