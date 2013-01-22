@@ -212,12 +212,14 @@ def signRequest(access_key, secret_key, host, region=None, service=None,
         query['SignatureVersion'] = 2
         query['SignatureMethod'] = 'HmacSHA256'
         if expires is not None:
-            query['Expires'] = getISO8601Time(expires)
+            query['Expires'] = getISO8601dashedTime(expires)
         else:
-            query['Timestamp'] = getISO8601Time(date)
+            query['Timestamp'] = getISO8601dashedTime(date)
         signature = calculateV2Signature(secret_key, date, uri, method, headers, query, body)
         query['Signature'] = signature
+
     elif signmethod == SIGNATURE_V4:
+
         if query is None: query = {}
         query['X-Amz-Date'] = getISO8601Time(date)
         query['X-Amz-Algorithm'] = 'AWS4-HMAC-SHA256'
@@ -225,6 +227,7 @@ def signRequest(access_key, secret_key, host, region=None, service=None,
         query['X-Amz-SignedHeaders'] = canonicalHeaderNames(headers)
         signature = calculateV4Signature(secret_key, region, service, date, uri, method, headers, query, body)
         query['X-Amz-Signature'] = signature
+
     elif signmethod == SIGNATURE_V4_HEADERS:
         signature = calculateV4Signature(secret_key, region, service, date, uri, method, headers, query, body)
         authorization = ['AWS4-HMAC-SHA256 Credential=',
@@ -234,6 +237,7 @@ def signRequest(access_key, secret_key, host, region=None, service=None,
                          ', Signature=',
                          signature]
         headers['Authorization'] = ''.join(authorization)
+
     elif signmethod == SIGNATURE_S3_REST:
         uriprefix = None
         for region in S3_ENDPOINTS:

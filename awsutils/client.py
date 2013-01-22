@@ -166,13 +166,6 @@ class AWSClient:
                 except:
                     pass
 
-            print("Requesting", method, host, uri, headers, query)
-
-            if query != {}:
-                url = "%s?%s" % (uri, authutils.canonicalQueryString(query))
-            else:
-                url = uri
-
             conn = self.getConnection(destination=host, timeout=receptiontimeout)
 
             headers, query, body = authutils.signRequest(access_key=self.access_key, secret_key=self.secret_key,
@@ -180,6 +173,13 @@ class AWSClient:
                                                          signmethod=signmethod, date=date,
                                                          uri=uri, method=method, headers=headers,
                                                          query=query, body=body, expires=expires)
+
+            print("Requesting", method, host, uri, headers, query)
+
+            if query != {}:
+                url = "%s?%s" % (uri, authutils.canonicalQueryString(query))
+            else:
+                url = uri
 
             try:
                 conn.request(method=method, url=url, body=body, headers=headers)

@@ -196,11 +196,11 @@ class S3Bucket():
         """
         download an object from s3 to a file like object, it's capable to resume interrupted uploads
         @param objectname: the name of the object in the s3 bucket
-        @type name: str
-        @param output: - file like object opened in "w+b" mode (must provide the write, seek and tell methods)
-                       - file name where we want to receive the data "w+b" mode
-                       - None so the data is returned in a tempfile.TemporaryFile "w+b" mode
-        @type output: object
+        @type objectname: str
+        @param inputobject: - file like object opened in "w+b" mode (must provide the write, seek and tell methods)
+                            - file name where we want to receive the data "w+b" mode
+                            - None so the data is returned in a tempfile.TemporaryFile "w+b" mode
+        @type inputobject: object
         @param hashcheck: enable checking of the downloaded data integrity (won't work if the object is multipart upload)
         @type hashcheck: bool
         @param byterange: a list with the desired range to be downloaded. ex: (10,) or (100,1000)
