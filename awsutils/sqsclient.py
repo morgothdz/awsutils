@@ -19,7 +19,7 @@ class SQSClient(AWSClient):
         pass
 
     def changeMessageVisibility(self, queueuri, receiptHandle, visibilityTimeout, endpoint=None):
-        if endpoint is None: endpoint = self.host
+        if endpoint is None: endpoint = self.endpoint
         if visibilityTimeout > 43200:
             raise SQSUserInputException('visibilityTimeout too big (max 43200 seconds)')
         query = {'Action': 'ChangeMessageVisibility', 'ReceiptHandle':receiptHandle,
@@ -37,7 +37,7 @@ class SQSClient(AWSClient):
         """
 
     def listQueues(self, queueNamePrefix=None, endpoint=None):
-        if endpoint is None: endpoint = self.host
+        if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'ListQueues', 'Version': '2012-11-05'}
         _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
                                                         region=endpoint[4:-14], service='sqs', host=endpoint)
@@ -56,7 +56,7 @@ class SQSClient(AWSClient):
         return result
 
     def getQueueUrl(self, queueName, queueOwnerAWSAccountId=None, endpoint=None):
-        if endpoint is None: endpoint = self.host
+        if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'GetQueueUrl', 'QueueName': queueName, 'Version': '2012-11-05'}
         if queueOwnerAWSAccountId is not None:
             query['QueueOwnerAWSAccountId'] = queueOwnerAWSAccountId
@@ -82,7 +82,7 @@ class SQSClient(AWSClient):
             ApproximateReceiveCount -returns the number of times a message has been received but not deleted.
             ApproximateFirstReceiveTimestamp -returns the time when the message was first received (epoch time in milliseconds).
         """
-        if endpoint is None: endpoint = self.host
+        if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'ReceiveMessage', 'Version': '2012-11-05'}
         if maxNumberOfMessages is not None:
             query['MaxNumberOfMessages'] = maxNumberOfMessages
@@ -108,7 +108,7 @@ class SQSClient(AWSClient):
         return data['Message']
 
     def deleteMessage(self, qName, accNumber, receiptHandle, endpoint=None):
-        if endpoint is None: endpoint = self.host
+        if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'DeleteMessage', 'ReceiptHandle':receiptHandle, 'Version': '2012-11-05'}
         _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
                                                         region=endpoint[4:-14], service='sqs', host=endpoint,
@@ -116,7 +116,7 @@ class SQSClient(AWSClient):
         data['DeleteMessageResponse']
 
     def sendMessage(self, qName, accNumber, messageBody, delaySeconds=None, endpoint=None, hashcheck=False):
-        if endpoint is None: endpoint = self.host
+        if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'SendMessage', 'MessageBody':messageBody, 'Version': '2012-11-05'}
         if delaySeconds is not None:
             if delaySeconds > 900:

@@ -65,19 +65,18 @@ class AWSPartialReception(Exception):
         return "AWSPartialReception [%d]" % (self.sizeinfo,)
 
 
-
 class AWSClient:
     MAX_IN_MEMORY_READ_CHUNK_SIZE_FOR_RAW_DATA = 1024 * 1024
     HTTP_CONNECTION_RETRY_NUMBER = 3
     HTTP_RECEPTION_TIMEOUT = 30
+    TEMP_DIR = '.'
 
-    def __init__(self, host, access_key, secret_key, secure=False, tmpdir='.'):
-        self.host = host
+    def __init__(self, endpoint, access_key, secret_key, secure=False):
+        self.endpoint = endpoint
         self.access_key = access_key
         self.secret_key = secret_key
         self.secure = secure
         self.connections = {}
-        self.tmpdir = tmpdir
 
     def test(self):
         date = time.gmtime()
@@ -140,7 +139,7 @@ class AWSClient:
 
         if retry is None: retry = self.HTTP_CONNECTION_RETRY_NUMBER
         if receptiontimeout is None: receptiontimeout = self.HTTP_RECEPTION_TIMEOUT
-        if host is None: host=self.host
+        if host is None: host=self.endpoint
 
         _redirectcount = 0
         _retrycount = 0
@@ -267,7 +266,7 @@ class AWSClient:
 
             if inputobject is None:
                 if size > self.MAX_IN_MEMORY_READ_CHUNK_SIZE_FOR_RAW_DATA:
-                    inputobject = tempfile.TemporaryFile(mode="w+b", dir=self.tmpdir, prefix='awstmp-')
+                    inputobject = tempfile.TemporaryFile(mode="w+b", dir=self.TEMP_DIR, prefix='awstmp-')
                 else:
                     inputobject = io.BytesIO()
                 if _inputIOWrapper is not None:

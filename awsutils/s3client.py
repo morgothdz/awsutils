@@ -23,8 +23,8 @@ class S3IntegrityException(Exception):
 class S3Client(AWSClient):
     def _buketname2PathAndEndpoint(self, bucketname):
         if bucketname != bucketname.lower():
-            return  "/" + bucketname + "/", self.host
-        return '/', bucketname + "." + self.host
+            return  "/" + bucketname + "/", self.endpoint
+        return '/', bucketname + "." + self.endpoint
 
 
     #==================================== operations on the service =======================================
