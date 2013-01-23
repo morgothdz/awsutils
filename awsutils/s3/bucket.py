@@ -6,7 +6,7 @@
 
 import os, hashlib
 from awsutils.s3.object import S3Object
-from awsutils.s3client import S3HashCheckException, S3IntegrityException
+from awsutils.s3client import S3HashCheckException, S3IntegrityException, S3UserInputException
 from awsutils.utils.wrappers import SimpleWindowedFileObjectReadWrapper, SimpleMd5FileObjectWriteWrapper
 from awsutils.client import AWSPartialReception
 
@@ -62,7 +62,7 @@ class S3Bucket():
     def renameObject(self, objectname, newObjectname):
         self.s3client.putObjectCopy(self.name, newObjectname, self.name, objectname)
         self.s3client.deleteObject(self.name, objectname)
-        
+
     def getMultipartUploads(self, prefix=None, delimiter=None, _maxuploads=500):
         """
         Generator: list all or those selected by prefix and delimiter pending multipart uploads
@@ -113,6 +113,7 @@ class S3Bucket():
         @param objectname: the name of the object in the s3 bucket
         @type objectname: str
         @param outputobject: file like object opened inr "rb" mode (must provide the read, seek and tell methods)
+                             can be also a filename
         @type outputobject: object
         @param start: the start ofsset from where we upload the data
         @type start: int
@@ -127,17 +128,19 @@ class S3Bucket():
         @rtype: dict
         """
         if chunklen < 5242880:
-            raise Exception("Your proposed upload is smaller than the minimum allowed (by amazon) size")
+            raise S3UserInputException("Your proposed upload is smaller than the minimum allowed (by amazon) size")
 
         closeoutputobject = False
-        if isinstance(outputobject, str) and os.path.isfile(outputobject):
+        if isinstance(outputobject, str):
+            if not os.path.isfile(outputobject):
+                raise S3UserInputException("outputobject is a string but points to nonexistent file")
             outputobject = open(outputobject, "rb")
             closeoutputobject = True
 
         wrappedobj = SimpleWindowedFileObjectReadWrapper(obj=outputobject, start=start, end=end, hashcheck=hashcheck)
 
         if wrappedobj.size / chunklen > 10000:
-            raise Exception("More than 10000 objects needed to complete this upload")
+            raise S3UserInputException("More than 10000 objects needed to complete this upload")
 
         try:
 
@@ -223,7 +226,7 @@ class S3Bucket():
             closeinputobject = True
 
         if hashcheck and byterange is not None:
-            raise Exception("downloading only ranges can't be hash checked")
+            raise S3UserInputException("downloading ranges can't be hash checked")
 
         if hashcheck and inputobject is not None:
             _inputobject = SimpleMd5FileObjectWriteWrapper(inputobject)
