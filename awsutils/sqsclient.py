@@ -25,6 +25,8 @@ class SQSClient(AWSClient):
             iam = IAMClient(access_key, secret_key, secure)
             userinfo = iam.getUser()
             self.accNumber = userinfo['UserId']
+            iam.closeConnections()
+            iam = None
         else:
             self.accNumber = accNumber
 

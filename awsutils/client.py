@@ -78,16 +78,9 @@ class AWSClient:
         self.secure = secure
         self.connections = {}
 
-    def test(self):
-        date = time.gmtime()
-        headers, query, body = authutils.signRequest(self.access_key, self.secret_key, host='sqs.us-east-1.amazonaws.com', region='us-east-1', service='sqs', signingmethod='v4headers', date= date,
-            query={'Action': 'ListQueues'})
-
-        conn = self.getConnection(destination=headers['Host'])
-        conn.request(method='GET', url="/?" + authutils.canonicalQueryString(query), headers=headers)
-        response = conn.getresponse()
-        r = response.read()
-        print(r)
+    def closeConnections(self):
+        for connection in self.connections.values():
+            connection.close()
 
     def is_connection_usable(self, httpconnection):
         sock = httpconnection.sock

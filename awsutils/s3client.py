@@ -33,7 +33,7 @@ class S3Client(AWSClient):
 
     #==================================== operations on the service =======================================
     def getService(self):
-        _status, _reason, _headers, data = self.request(method='GET', uri='/')
+        _status, _reason, _headers, data = self.request(method='GET', uri='/', signmethod=SIGNATURE_S3_REST)
         buckets = data['ListAllMyBucketsResult']['Buckets']['Bucket']
         if isinstance(buckets, dict): buckets = [buckets]
         return data['ListAllMyBucketsResult']
