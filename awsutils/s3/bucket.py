@@ -56,6 +56,13 @@ class S3Bucket():
         """
         return self.s3client.headObject(self.name, objectname)['status'] == 200
 
+    def delObject(self, objectname):
+        return self.s3client.deleteObject(self.name, objectname)
+
+    def renameObject(self, objectname, newObjectname):
+        self.s3client.putObjectCopy(self.name, newObjectname, self.name, objectname)
+        self.s3client.deleteObject(self.name, objectname)
+        
     def getMultipartUploads(self, prefix=None, delimiter=None, _maxuploads=500):
         """
         Generator: list all or those selected by prefix and delimiter pending multipart uploads

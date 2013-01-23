@@ -8,6 +8,10 @@ import binascii, base64, json
 from awsutils.client import AWSClient
 from awsutils.utils.auth import SIGNATURE_S3_REST
 
+
+class S3UserInputException(Exception):
+    pass
+
 class S3Exception(Exception):
     pass
 
@@ -143,7 +147,7 @@ class S3Client(AWSClient):
             query['vesionId'] = versionID
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, headers, _data = self.request(method="DELETE", uri=uri, host=endpoint, query=query,
+        _status, _reason, headers, _data = self.request(method="DELETE", uri=uri + objectname, host=endpoint, query=query,
                                                         statusexpected=[204], signmethod=SIGNATURE_S3_REST)
 
         headers = dict((k, v) for k, v in headers.items() if k in ('x-amz-version-id', 'x-amz-delete-marker'))
@@ -198,7 +202,7 @@ class S3Client(AWSClient):
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
         status, _reason, headers, range, data = self.request(method="HEAD" if _doHeadRequest else "GET",
-                                                             uri=uri,
+                                                             uri=uri + objectname,
                                                              headers=headers,
                                                              host=endpoint,
                                                              statusexpected=statusexpected,
@@ -259,7 +263,7 @@ class S3Client(AWSClient):
             headers['Content-MD5'] = base64.b64encode(md5digest).strip().decode()
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, headers, _data = self.request(method="PUT", uri=uri, body=value,
+        _status, _reason, headers, _data = self.request(method="PUT", uri=uri + objectname, body=value,
                                                         headers=headers,
                                                         host=endpoint, signmethod=SIGNATURE_S3_REST)
         if md5digest is not None:
@@ -275,13 +279,14 @@ class S3Client(AWSClient):
                       x_amz_server_side_encryption=None,
                       x_amz_storage_class=None,
                       x_amz_website_redirect_location=None,
-                      # TODO: not handled yet
                       x_amz_metadata_directive=None,
                       x_amz_copy_source_if_match=None, x_amz_copy_source_if_none_match=None,
+                      # TODO: not handled yet
                       x_amz_copy_source_if_unmodified_since=None, x_amz_copy_source_if_modified_since=None,
                       x_amz_acl=None,
                       x_amz_grant_read=None, x_amz_grant_write=None, x_amz_grant_read_acp=None,
                       x_amz_grant_write_acp=None, x_amz_grant_full_control=None):
+
         headers = {'x-amz-copy-source': "/%s/%s" % (sourcebucketname, sourceobjectname)}
         if x_amz_server_side_encryption is not None:
             headers['x-amz-server-side-encryption'] = x_amz_server_side_encryption
@@ -290,8 +295,18 @@ class S3Client(AWSClient):
         if x_amz_website_redirect_location is not None:
             headers['x-amz-website-redirect-location'] = x_amz_website_redirect_location
 
+        if x_amz_metadata_directive is not None:
+            if x_amz_metadata_directive not in ['COPY','REPLACE']:
+                raise S3UserInputException('x_amz_metadata_directive valid values: COPY|REPLACE')
+            headers['x-amz-metadata-directive'] = x_amz_metadata_directive
+        if x_amz_copy_source_if_match is not None:
+            headers['x-amz-copy-source-if-match'] = x_amz_copy_source_if_match
+        if x_amz_copy_source_if_none_match is not None:
+            headers['x-amz-copy-source-if-none-match'] = x_amz_copy_source_if_none_match
+
+
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="PUT", uri=uri,
+        _status, _reason, _headers, data = self.request(method="PUT", uri=uri + objectname,
                                                         headers=headers,
                                                         host=endpoint, signmethod=SIGNATURE_S3_REST)
         return data['CopyObjectResult']
@@ -320,7 +335,7 @@ class S3Client(AWSClient):
             headers['Content-MD5'] = base64.b64encode(md5digest).strip().decode()
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, headers, _data = self.request(method="PUT", uri=uri, body=value,
+        _status, _reason, headers, _data = self.request(method="PUT", uri=uri + objectname, body=value,
                                                         headers=headers,
                                                         host=endpoint,
                                                         query={"partNumber": partnumber, "uploadId": uploadid},
@@ -362,7 +377,7 @@ class S3Client(AWSClient):
             headers['x-amz-website-redirect-location'] = x_amz_website_redirect_location
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="POST", uri=uri,
+        _status, _reason, _headers, data = self.request(method="POST", uri=uri + objectname,
                                                         headers=headers, host=endpoint,
                                                         query={"uploads": None}, signmethod=SIGNATURE_S3_REST)
         data = data['InitiateMultipartUploadResult']
@@ -377,7 +392,7 @@ class S3Client(AWSClient):
         data.append("</CompleteMultipartUpload>")
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="POST", uri=uri,
+        _status, _reason, _headers, data = self.request(method="POST", uri=uri + objectname,
                                                         body="".join(data),
                                                         host=endpoint, query={"uploadId": uploadId},
                                                         signmethod=SIGNATURE_S3_REST)
@@ -398,7 +413,7 @@ class S3Client(AWSClient):
         if part_number_marker is not None:
             query['part-number-marker'] = part_number_marker
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri,
+        _status, _reason, _headers, data = self.request(method="GET", uri=uri + objectname,
                                                         host=endpoint, query=query, signmethod=SIGNATURE_S3_REST)
         data = data['ListPartsResult']
         if data['Bucket'] != bucketname or data['Key'] != objectname:
