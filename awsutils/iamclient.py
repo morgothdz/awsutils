@@ -8,10 +8,10 @@ from awsutils.client import AWSClient
 from awsutils.utils.auth import SIGNATURE_V2, SIGNATURE_V4
 
 class IAMClient(AWSClient):
-    def __init__(self, access_key, secret_key, secure=False):
+    def __init__(self, access_key, secret_key):
         #IAM has only one endpoint
-        endpoint = 'iam.amazonaws.com'
-        AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
+        #IAM calls should be always https
+        AWSClient.__init__(self, endpoint = 'iam.amazonaws.com', access_key, secret_key, secure=True)
 
     def getUser(self, userName=None):
         query = {'Action': 'GetUser', 'Version': '2010-05-08'}

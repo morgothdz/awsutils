@@ -22,7 +22,7 @@ class SQSClient(AWSClient):
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
         #try to retrieve the curent user's account number
         if accNumber is None:
-            iam = IAMClient(access_key, secret_key, secure)
+            iam = IAMClient(access_key, secret_key)
             userinfo = iam.getUser()
             self.accNumber = userinfo['UserId']
             iam.closeConnections()
