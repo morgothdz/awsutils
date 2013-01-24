@@ -161,7 +161,7 @@ class AWSClient:
             conn = self.getConnection(destination=host, timeout=receptiontimeout)
 
             headers, query, body = authutils.signRequest(access_key=self.access_key, secret_key=self.secret_key,
-                                                         host=host, region=region, service=service,
+                                                         endpoint=host, region=region, service=service,
                                                          signmethod=signmethod, date=date,
                                                          uri=uri, method=method, headers=headers,
                                                          query=query, body=body, expires=expires)
@@ -214,6 +214,8 @@ class AWSClient:
 
                 if 300 <= response.status < 400:
                     try:
+                        #TODO: we should differentiate between temporary and permanent redirect,
+                        #and handle correctly the second
                         if awsresponse['Error']['Code'] in ('TemporaryRedirect', 'PermanentRedirect'):
                             redirect = awsresponse['Error']['Endpoint']
                             if _redirectcount < 3:
@@ -224,7 +226,7 @@ class AWSClient:
                         pass
 
                 if response.status not in statusexpected:
-                    # TODO: maybe we should retry on some status?
+                    #TODO: maybe we should retry on some status?
                     raise AWSException(response.status, response.reason, dict(response.headers), awsresponse)
 
                 return response.status, response.reason, dict(response.headers), awsresponse

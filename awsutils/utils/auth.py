@@ -196,14 +196,14 @@ def calculateV4Signature(secret_key, region, service, date=time.gmtime(), uri='/
     return signature
 
 
-def signRequest(access_key, secret_key, host, region=None, service=None,
+def signRequest(access_key, secret_key, endpoint, region=None, service=None,
                 signmethod=None, date=time.gmtime(),
                 uri='/', method='GET', headers=None,
                 query=None, body=b'', expires=None):
     #signmethod v2, v4, v4headers
     date = time.gmtime()
     if headers is None: headers = {}
-    headers['Host'] = host
+    headers['Host'] = endpoint
     headers['Date'] = getISO8601dashedTime(date)
 
     if signmethod == SIGNATURE_V2:
@@ -239,16 +239,26 @@ def signRequest(access_key, secret_key, host, region=None, service=None,
         headers['Authorization'] = ''.join(authorization)
 
     elif signmethod == SIGNATURE_S3_REST:
-        uriprefix = None
+        #detect if the bucket name is in the endpoint
+        bucketname = None
         for region in S3_ENDPOINTS:
-            if host[1:].endswith(region):
-                uriprefix = host[0:- (len(region) + 1)]
+            if endpoint[1:].endswith(region):
+                bucketname = endpoint[0:- (len(region) + 1)]
                 break
-        if uriprefix is not None:
-            uri = '/' + uriprefix + uri
+        else:
+            parts = endpoint.split('.')
+            if len(parts) > 3:
+                if "s3-external" in parts[-3]:
+                    bucketname = '.'.join(parts[0:-3])
+        if bucketname is not None:
+            uri = '/' + bucketname + uri
+
         headers['Date'] = awsDate(date)
         canonicalRequest = canonicalRequestS3Rest(method=method, uri=uri, headers=headers, query=query,
                                                   expires=expires)
+
+        print("canonicalRequest", canonicalRequest)
+
         headers["Authorization"] = 'AWS %s:%s' % (
             access_key,
             base64.b64encode(HMAC_SHA1(secret_key, canonicalRequest, hexdigest=False)).strip().decode())
