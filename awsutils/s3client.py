@@ -264,7 +264,7 @@ class S3Client(AWSClient):
                                                                 'x-amz-version-id'))
 
 
-    def putObjectCopy(self, bucketname, objectname, sourcebucketname, sourceobjectname,
+    def putObjectCopy(self, bucketname, objectname, sourcebucketname, sourceobjectname, metadata=None,
                       x_amz_server_side_encryption=None,
                       x_amz_storage_class=None,
                       x_amz_website_redirect_location=None,
@@ -283,7 +283,10 @@ class S3Client(AWSClient):
             headers['x-amz-storage-class'] = x_amz_storage_class
         if x_amz_website_redirect_location is not None:
             headers['x-amz-website-redirect-location'] = x_amz_website_redirect_location
-
+        if metadata is not None:
+            for name in metadata:
+                headers['x-amz-meta-'+ name] = metadata[name]
+                headers['x-amz-metadata-directive'] = 'REPLACE'
         if x_amz_metadata_directive is not None:
             if x_amz_metadata_directive not in ['COPY','REPLACE']:
                 raise UserInputException('x_amz_metadata_directive valid values: COPY|REPLACE')

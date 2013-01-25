@@ -49,9 +49,13 @@ class SimpleDBClient(AWSClient):
         query = {'Action': 'BatchPutAttributes', 'DomainName':domainName, 'Version': '2009-04-15'}
         i = 1
         for itemName in items:
+            if i > 25:
+                raise UserInputException('25 item limit per BatchPutAttributes operation exceded')
             query['Item.%d.ItemName'%(i,)] = itemName
             a = 1
             for attributeName in items[itemName]:
+                if a > 256:
+                    raise UserInputException('256 attribute name-value pairs per item exceded')
                 query['Item.%d.Attribute.%d.name'%(i,a)] = attributeName
                 v = items[itemName][attributeName]
                 if isinstance(v, list):
