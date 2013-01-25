@@ -11,7 +11,7 @@ class IAMClient(AWSClient):
     def __init__(self, access_key, secret_key):
         #IAM has only one endpoint
         #IAM calls should be always https
-        AWSClient.__init__(self, endpoint = 'iam.amazonaws.com', access_key, secret_key, secure=True)
+        AWSClient.__init__(self, 'iam.amazonaws.com', access_key, secret_key, secure=True)
 
     def getUser(self, userName=None):
         query = {'Action': 'GetUser', 'Version': '2010-05-08'}

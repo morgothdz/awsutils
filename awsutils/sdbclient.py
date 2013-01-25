@@ -4,11 +4,8 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-from awsutils.client import AWSClient
+from awsutils.client import AWSClient, UserInputException
 from awsutils.utils.auth import SIGNATURE_V2
-
-class SimpleDBUserInputException(Exception):
-    pass
 
 class SimpleDBClient(AWSClient):
     def __init__(self, endpoint, access_key, secret_key, secure=False):
@@ -95,7 +92,7 @@ class SimpleDBClient(AWSClient):
         query = {'Action': 'ListDomains', 'Version': '2009-04-15'}
         if maxNumberOfDomains is not None:
             if maxNumberOfDomains > 100:
-                raise SimpleDBUserInputException('The maximum number of domain names is 100')
+                raise UserInputException('The maximum number of domain names is 100')
             query['MaxNumberOfDomains'] = maxNumberOfDomains
         if nextToken is not None:
             query['NextToken'] = nextToken

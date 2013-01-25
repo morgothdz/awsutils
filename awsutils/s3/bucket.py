@@ -6,9 +6,8 @@
 
 import os, hashlib
 from awsutils.s3.object import S3Object
-from awsutils.s3client import S3HashCheckException, S3IntegrityException, S3UserInputException
 from awsutils.utils.wrappers import SimpleWindowedFileObjectReadWrapper, SimpleMd5FileObjectWriteWrapper
-from awsutils.client import AWSPartialReception
+from awsutils.client import AWSPartialReception, IntegrityCheckException, UserInputException
 
 class S3Bucket():
     def __init__(self, name, s3client,
@@ -128,19 +127,19 @@ class S3Bucket():
         @rtype: dict
         """
         if chunklen < 5242880:
-            raise S3UserInputException("Your proposed upload is smaller than the minimum allowed (by amazon) size")
+            raise UserInputException("Your proposed upload is smaller than the minimum allowed (by amazon) size")
 
         closeoutputobject = False
         if isinstance(outputobject, str):
             if not os.path.isfile(outputobject):
-                raise S3UserInputException("outputobject is a string but points to nonexistent file")
+                raise UserInputException("param outputobject is a string but points to nonexistent file")
             outputobject = open(outputobject, "rb")
             closeoutputobject = True
 
         wrappedobj = SimpleWindowedFileObjectReadWrapper(obj=outputobject, start=start, end=end, hashcheck=hashcheck)
 
         if wrappedobj.size / chunklen > 10000:
-            raise S3UserInputException("More than 10000 objects needed to complete this upload")
+            raise UserInputException("More than 10000 objects needed to complete this upload")
 
         try:
 
@@ -149,7 +148,7 @@ class S3Bucket():
                     objlen=wrappedobj.size)
                 if hashcheck:
                     if result['ETag'][1:-1] != wrappedobj.getMd5HexDigest():
-                        raise S3HashCheckException('upload hash mismatch')
+                        raise IntegrityCheckException('upload hash mismatch')
                 return result
 
             #multipart upload =>
@@ -178,7 +177,7 @@ class S3Bucket():
 
                     senthash = wrappedobj.getMd5HexDigest()
                     if hashcheck and result['ETag'][1:-1] != senthash:
-                        raise S3HashCheckException('multipart upload part hash mismatch')
+                        raise IntegrityCheckException('multipart upload part hash mismatch')
 
                     print('uploadOjectPart', result, wrappedobj.getMd5HexDigest())
 
@@ -226,7 +225,7 @@ class S3Bucket():
             closeinputobject = True
 
         if hashcheck and byterange is not None:
-            raise S3UserInputException("downloading ranges can't be hash checked")
+            raise UserInputException("downloading ranges can't be hash checked")
 
         if hashcheck and inputobject is not None:
             _inputobject = SimpleMd5FileObjectWriteWrapper(inputobject)
@@ -278,10 +277,10 @@ class S3Bucket():
 
         if byterange is not None and len(byterange) > 1:
             if byterange[1] != range['end']:
-                raise S3IntegrityException('size mismatch')
+                raise IntegrityCheckException('size mismatch')
         else:
             if range['size'] != range['end'] + 1:
-                raise S3IntegrityException('size mismatch')
+                raise IntegrityCheckException('size mismatch')
 
 
         etag = result['ETag'][1:-1]
@@ -290,7 +289,7 @@ class S3Bucket():
                 print("warning: this is a multipart upload")
             else:
                 if etag != _inputobject.getMd5HexDigest():
-                    raise S3HashCheckException('invalid download hash')
+                    raise IntegrityCheckException('invalid download hash')
             _inputobject = _inputobject.obj
 
         if closeinputobject:

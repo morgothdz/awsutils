@@ -5,17 +5,9 @@
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 import hashlib
-from awsutils.client import AWSClient
+from awsutils.client import AWSClient, UserInputException, IntegrityCheckException
 from awsutils.iamclient import IAMClient
 from awsutils.utils.auth import SIGNATURE_V4_HEADERS
-
-class SQSUserInputException(Exception):
-    pass
-
-
-class SQSHashCheckException(Exception):
-    pass
-
 
 class SQSClient(AWSClient):
     def __init__(self, endpoint, access_key, secret_key, accNumber=None, secure=False):
@@ -38,7 +30,7 @@ class SQSClient(AWSClient):
         if endpoint is None: endpoint = self.endpoint
         if accNumber is None: accNumber = self.accNumber
         if visibilityTimeout > 43200:
-            raise SQSUserInputException('visibilityTimeout too big (max 43200 seconds)')
+            raise UserInputException('param visibilityTimeout too big (max 43200 seconds)')
         query = {'Action': 'ChangeMessageVisibility', 'ReceiptHandle': receiptHandle,
                  'VisibilityTimeout': visibilityTimeout, 'Version': '2012-11-05'}
         _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
@@ -61,37 +53,37 @@ class SQSClient(AWSClient):
         i = 1
         if delaySeconds is not None:
             if not isinstance(delaySeconds, int) or not 0 <= delaySeconds <= 900:
-                raise SQSUserInputException("delaySeconds sould be an integer between 0 and 900 (15 minutes)")
+                raise UserInputException("param delaySeconds sould be an integer between 0 and 900 (15 minutes)")
             query["Attribute.%d.Name"%(i,)] = "DelaySeconds"
             query["Attribute.%d.Value"%(i,)] = delaySeconds
             i += 1
 
         if maximumMessageSize is not None:
             if not isinstance(maximumMessageSize, int) or not 1024 <= maximumMessageSize <= 65536:
-                raise SQSUserInputException("maximumMessageSize sould be an integer between 1024 and 65536 (64 KiB)")
+                raise UserInputException("param maximumMessageSize sould be an integer between 1024 and 65536 (64 KiB)")
             query["Attribute.%d.Name"%(i,)] = "MaximumMessageSize"
             query["Attribute.%d.Value"%(i,)] = maximumMessageSize
             i += 1
 
         if messageRetentionPeriod is not None:
             if not isinstance(messageRetentionPeriod, int) or not 60 <= messageRetentionPeriod <= 1209600:
-                raise SQSUserInputException(
-                    "messageRetentionPeriod sould be an integer between 60 (1 minute) and 1209600 (14 days)")
+                raise UserInputException(
+                    "param messageRetentionPeriod sould be an integer between 60 (1 minute) and 1209600 (14 days)")
             query["Attribute.%d.Name"%(i,)] = "MessageRetentionPeriod"
             query["Attribute.%d.Value"%(i,)] = messageRetentionPeriod
             i += 1
 
         if receiveMessageWaitTimeSeconds is not None:
             if not isinstance(receiveMessageWaitTimeSeconds, int) or not 0 <= receiveMessageWaitTimeSeconds <= 20:
-                raise SQSUserInputException(
-                    "receiveMessageWaitTimeSeconds sould be an integer between 0 and 20 (secconds)")
+                raise UserInputException(
+                    "param receiveMessageWaitTimeSeconds sould be an integer between 0 and 20 (secconds)")
             query["Attribute.%d.Name"%(i,)] = "ReceiveMessageWaitTimeSeconds"
             query["Attribute.%d.Value"%(i,)] = receiveMessageWaitTimeSeconds
             i += 1
 
         if visibilityTimeout is not None:
             if not isinstance(visibilityTimeout, int) or not 1024 <= visibilityTimeout <= 65536:
-                raise SQSUserInputException("visibilityTimeout sould be an integer between 0 and 43200 (12 hours)")
+                raise UserInputException("param visibilityTimeout sould be an integer between 0 and 43200 (12 hours)")
             query["Attribute.%d.Name"%(i,)] = "VisibilityTimeout"
             query["Attribute.%d.Value"%(i,)] = visibilityTimeout
             i += 1
@@ -215,7 +207,7 @@ class SQSClient(AWSClient):
         query = {'Action': 'SendMessage', 'MessageBody': messageBody, 'Version': '2012-11-05'}
         if delaySeconds is not None:
             if delaySeconds > 900:
-                raise SQSUserInputException('delaySeconds too big (max 900 seconds)')
+                raise UserInputException('param delaySeconds too big (max 900 seconds)')
             query['DelaySeconds'] = delaySeconds
         _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
                                                         region=endpoint[4:-14], service='sqs', host=endpoint,
@@ -227,4 +219,4 @@ class SQSClient(AWSClient):
             md5.update(messageBody)
             md5calculated = md5.hexdigest()
             if md5message != md5calculated:
-                raise SQSHashCheckException()
+                raise IntegrityCheckException("sent message md5 doesn't match the calculated one")

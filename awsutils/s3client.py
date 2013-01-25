@@ -5,22 +5,11 @@
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 import binascii, base64, json
-from awsutils.client import AWSClient
+from awsutils.client import AWSClient, UserInputException, IntegrityCheckException
 from awsutils.utils.auth import SIGNATURE_S3_REST
 
 
-class S3UserInputException(Exception):
-    pass
-
 class S3Exception(Exception):
-    pass
-
-
-class S3HashCheckException(Exception):
-    pass
-
-
-class S3IntegrityException(Exception):
     pass
 
 
@@ -268,7 +257,7 @@ class S3Client(AWSClient):
                                                         host=endpoint, signmethod=SIGNATURE_S3_REST)
         if md5digest is not None:
             if headers['ETag'][1:-1] != binascii.hexlify(md5digest).decode():
-                raise S3Exception('put-object-invalid-md5')
+                raise IntegrityCheckException('put object invalid hash check mismatch')
 
         return dict((k, v) for k, v in headers.items() if k in ('ETag',
                                                                 'x-amz-expiration', 'x-amz-server-side-encryption',
@@ -297,7 +286,7 @@ class S3Client(AWSClient):
 
         if x_amz_metadata_directive is not None:
             if x_amz_metadata_directive not in ['COPY','REPLACE']:
-                raise S3UserInputException('x_amz_metadata_directive valid values: COPY|REPLACE')
+                raise UserInputException('x_amz_metadata_directive valid values: COPY|REPLACE')
             headers['x-amz-metadata-directive'] = x_amz_metadata_directive
         if x_amz_copy_source_if_match is not None:
             headers['x-amz-copy-source-if-match'] = x_amz_copy_source_if_match
@@ -342,7 +331,7 @@ class S3Client(AWSClient):
                                                         signmethod=SIGNATURE_S3_REST)
         if md5digest is not None:
             if headers['ETag'][1:-1] != binascii.hexlify(md5digest).decode():
-                raise S3Exception('put-object-invalid-md5')
+                raise IntegrityCheckException('upload object parth hash mismatch')
         return dict((k, v) for k, v in headers.items() if k in ('ETag'))
 
     def uploadPartCopy(self, bucketname, objectname, partnumber, uploadID, sourcebucketname, sourceobjectname,

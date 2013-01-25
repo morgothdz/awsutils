@@ -19,6 +19,11 @@ except ImportError:  # Doesn't exist on OSX and other platforms
 from awsutils.utils.xmlhandler import AWSXMLHandler
 import awsutils.utils.auth as authutils
 
+class UserInputException(Exception):
+    pass
+
+class IntegrityCheckException(Exception):
+    pass
 
 class AWSException(Exception):
     """exceptions raised on amazon error responses"""
