@@ -7,52 +7,73 @@
 import binascii, base64, json
 from awsutils.client import AWSClient, UserInputException, IntegrityCheckException
 from awsutils.utils.auth import SIGNATURE_S3_REST
-from awsutils.utils.exceptions import generateExceptionDict
+from awsutils.utils.exceptions import generateExceptionDictionary
 
-
-class S3Exception(Exception):
-    pass
 
 class AWSS3Exception_AccessDenied(Exception):
+    #Access Denied
     HTTP_STATUS = 403
-    MESSAGE = 'Access Denied'
 
 class AWSS3Exception_AccountProblem(Exception):
+    #There is a problem with your AWS account that prevents the operation from completing successfully
     HTTP_STATUS = 403
-    MESSAGE = 'There is a problem with your AWS account that prevents the operation from completing successfully.'
 
 class AWSS3Exception_AmbiguousGrantByEmailAddress(Exception):
+    #The e-mail address you provided is associated with more than one account
     HTTP_STATUS = 400
-    MESSAGE = 'The e-mail address you provided is associated with more than one account.'
 
 class AWSS3Exception_BadDigest(Exception):
+    #The Content-MD5 you specified did not match what we received
     HTTP_STATUS = 400
-    MESSAGE = 'The Content-MD5 you specified did not match what we received.'
 
 class AWSException_BucketAlreadyExists(Exception):
+    #The requested bucket name is not available. The bucket namespace is shared by all users of the system
     HTTP_STATUS = 409
-    MESSAGE = 'The requested bucket name is not available. The bucket namespace is shared by all users of the system.' \
-              ' Please select a different name and try again.'
 
 class AWSS3Exception_BucketAlreadyOwnedByYou(Exception):
+    #Your previous request to create the named bucket succeeded and you already own it
     HTTP_STATUS = 409
-    MESSAGE = 'Your previous request to create the named bucket succeeded and you already own it.'
 
 class AWSS3Exception_BucketNotEmpty(Exception):
+    #The bucket you tried to delete is not empty
     HTTP_STATUS = 409
-    MESSAGE = 'The bucket you tried to delete is not empty.'
 
 class AWSS3Exception_CredentialsNotSupported(Exception):
+    #This request does not support credentials
     HTTP_STATUS = 400
-    MESSAGE = 'This request does not support credentials.'
+
+class AWSS3Exception_CredentialsNotSupported(Exception):
+    #This request does not support credentials
+    HTTP_STATUS = 400
+
+class AWSS3Exception_CrossLocationLoggingProhibited(Exception):
+    #Cross location logging not allowed. Buckets in one geographic location cannot log information to a
+    #bucket in another location
+    HTTP_STATUS = 403
+
+class AWSS3Exception_EntityTooSmall(Exception):
+    #Your proposed upload is smaller than the minimum allowed object size
+    HTTP_STATUS = 400
+
+class AWSS3Exception_EntityTooLarge(Exception):
+    #Your proposed upload exceeds the maximum allowed object size
+    HTTP_STATUS = 400
+
+class AWSS3Exception_ExpiredToken(Exception):
+    #The provided token has expired
+    HTTP_STATUS = 400
+
+class AWSS3Exception_IllegalVersioningConfigurationException(Exception):
+    #Indicates that the Versioning configuration specified in the request is invalid
+    HTTP_STATUS = 400
 
 class AWSS3Exception_SignatureDoesNotMatch(Exception):
+    #The request signature we calculated does not match the signature you provided
     HTTP_STATUS = 403
-    MESSAGE = 'The request signature we calculated does not match the signature you provided.'
 
 class S3Client(AWSClient):
 
-    EXCEPTIONS = generateExceptionDict(__name__, exceptionprefix = 'AWSS3Exception_')
+    EXCEPTIONS = generateExceptionDictionary(__name__, exceptionprefix = 'AWSS3Exception_')
 
     #==================================== operations on the service ====================================================
     def getService(self):
@@ -60,7 +81,6 @@ class S3Client(AWSClient):
         buckets = data['ListAllMyBucketsResult']['Buckets']['Bucket']
         if isinstance(buckets, dict): buckets = [buckets]
         return data['ListAllMyBucketsResult']
-
 
     #==================================== operations on the buckets ====================================================
     def deleteBucket(self, bucketname):
@@ -292,7 +312,8 @@ class S3Client(AWSClient):
                                                         host=endpoint, signmethod=SIGNATURE_S3_REST)
         if md5digest is not None:
             if headers['ETag'][1:-1] != binascii.hexlify(md5digest).decode():
-                raise IntegrityCheckException('put object invalid hash check mismatch')
+                raise IntegrityCheckException('putObject returned unexpected ETag value',
+                                              headers['ETag'][1:-1], binascii.hexlify(md5digest).decode())
 
         return dict((k, v) for k, v in headers.items() if k in ('ETag',
                                                                 'x-amz-expiration', 'x-amz-server-side-encryption',
@@ -369,7 +390,8 @@ class S3Client(AWSClient):
                                                         signmethod=SIGNATURE_S3_REST)
         if md5digest is not None:
             if headers['ETag'][1:-1] != binascii.hexlify(md5digest).decode():
-                raise IntegrityCheckException('upload object parth hash mismatch')
+                raise IntegrityCheckException('uploadOjectPart returned unexpected ETag value', headers['ETag'][1:-1],
+                                              binascii.hexlify(md5digest).decode())
         return dict((k, v) for k, v in headers.items() if k in ('ETag'))
 
     def uploadPartCopy(self, bucketname, objectname, partnumber, uploadID, sourcebucketname, sourceobjectname,
@@ -409,7 +431,8 @@ class S3Client(AWSClient):
                                                         query={"uploads": None}, signmethod=SIGNATURE_S3_REST)
         data = data['InitiateMultipartUploadResult']
         if data['Bucket'] != bucketname or data['Key'] != objectname:
-            raise S3Exception('invalid-bucket-key', data, bucketname, objectname)
+            raise IntegrityCheckException('unexpected bucket/key name received', (data['Bucket'],data['Key']),
+                                          (bucketname, objectname))
         return data
 
     def completeMultipartUpload(self, bucketname, objectname, uploadId, parts):
@@ -425,7 +448,8 @@ class S3Client(AWSClient):
                                                         signmethod=SIGNATURE_S3_REST)
         data = data['CompleteMultipartUploadResult']
         if data['Bucket'] != bucketname or data['Key'] != objectname:
-            raise S3Exception('invalid-bucket-key', data, bucketname, objectname)
+            raise IntegrityCheckException('unexpected bucket/key name received', (data['Bucket'],data['Key']),
+                                          (bucketname, objectname))
         return data
 
     def abortMultipartUpload(self, bucketname, objectname, uploadId):
@@ -444,7 +468,8 @@ class S3Client(AWSClient):
                                                         host=endpoint, query=query, signmethod=SIGNATURE_S3_REST)
         data = data['ListPartsResult']
         if data['Bucket'] != bucketname or data['Key'] != objectname:
-            raise S3Exception('invalid-bucket-key', data, bucketname, objectname)
+            raise IntegrityCheckException('unexpected bucket/key name received', (data['Bucket'],data['Key']),
+                                          (bucketname, objectname))
         return data
 
     #================================== helper functions ===============================================================

@@ -4,7 +4,7 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-import time, hmac, hashlib, io, base64, socket, tempfile
+import time, io, socket, tempfile, logging
 import http.client
 import xml.sax
 
@@ -24,8 +24,10 @@ class UserInputException(Exception):
 
 
 class IntegrityCheckException(Exception):
-    pass
-
+    def __int__(self, message, received = None, expected = None):
+        Exception.__init__(self, message)
+        self.received = received
+        self.expected = expected
 
 class AWSException(Exception):
     """exceptions raised on amazon error responses"""
@@ -50,7 +52,6 @@ class AWSDataException(Exception):
 
     def __repr__(self):
         return repr(self.__dict__)
-
 
 class AWSTimeout(Exception):
     pass
@@ -84,6 +85,8 @@ class AWSClient:
         self.secret_key = secret_key
         self.secure = secure
         self.connections = {}
+        self.logger = logging.getLogger("%s.%s" % (type(self).__module__, type(self).__name__))
+        self.logger.addHandler(logging.NullHandler())
 
     def closeConnections(self):
         for connection in self.connections.values():
@@ -114,7 +117,7 @@ class AWSClient:
                 # this connection is bogus or dropped so close it
             self.connections[destination].close()
 
-        print("connecting to", destination)
+        self.logger.debug("connecting to %s", destination)
         if self.secure:
             #TODO: https contex checking
             conn = http.client.HTTPSConnection(destination, timeout=timeout)
@@ -172,7 +175,7 @@ class AWSClient:
                                                          uri=uri, method=method, headers=headers,
                                                          query=query, body=body, expires=expires)
 
-            print("Requesting", method, host, uri, headers, query)
+            self.logger.debug("Requesting %s %s %s query=%s headers=%s", method, host, uri, query, headers)
 
             if query != {}:
                 url = "%s?%s" % (uri, authutils.canonicalQueryString(query))
@@ -211,7 +214,7 @@ class AWSClient:
                         raise
                     if len(data) == 0:
                         break
-                    print(">>", data)
+                    self.logger.debug("Received >> %s", data)
                     incrementalParser.feed(data)
                 if doretry:
                     continue
@@ -247,8 +250,8 @@ class AWSClient:
                     data = response.read(1024)
                     while response.read(32768) != b'':
                         pass
-                except Exception as e:
-                    print(e)
+                except:
+                    pass
 
                 if response.status not in statusexpected:
                     #TODO: maybe we should retry on some status?
@@ -285,7 +288,6 @@ class AWSClient:
                         raise AWSTimeout('operation timeout')
                     data = response.read(32768)
                     ammount += len(data)
-                    #print(ammount, sizeinfo['size'])
 
                 except Exception as e:
                     if ammount > 0:

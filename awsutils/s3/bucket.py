@@ -148,7 +148,8 @@ class S3Bucket():
                     objlen=wrappedobj.size)
                 if hashcheck:
                     if result['ETag'][1:-1] != wrappedobj.getMd5HexDigest():
-                        raise IntegrityCheckException('upload hash mismatch')
+                        raise IntegrityCheckException('uploadArbitrarySizedObject.putObject unexpected ETag received',
+                                                      result['ETag'][1:-1], wrappedobj.getMd5HexDigest())
                 return result
 
             #multipart upload =>
@@ -177,24 +178,23 @@ class S3Bucket():
 
                     senthash = wrappedobj.getMd5HexDigest()
                     if hashcheck and result['ETag'][1:-1] != senthash:
-                        raise IntegrityCheckException('multipart upload part hash mismatch')
-
-                    print('uploadOjectPart', result, wrappedobj.getMd5HexDigest())
+                        raise IntegrityCheckException('uploadArbitrarySizedObject.uploadOjectPart unexpected '
+                                                      'ETag received',
+                                                      result['ETag'][1:-1], senthash)
 
                     parts[partnumber] = result['ETag']
                     start += tosendlen
 
                 else:
-                    raise Exception("we should'n reach this point")
+                    raise Exception("we shouldn't reach this point")
 
                 result = self.s3client.completeMultipartUpload(bucketname=self.name, objectname=objectname,
                                                                uploadId=upload['UploadId'], parts=parts)
                 return result
 
-
             except Exception as e:
-                print('uploadLargeObject', e)
                 self.s3client.abortMultipartUpload(bucketname=self.name, objectname=objectname, uploadId=upload['UploadId'])
+                raise
 
         finally:
             if closeoutputobject:
@@ -242,7 +242,7 @@ class S3Bucket():
 
             while True:
                 try:
-                    print("byterange", byterange)
+                    self.logger.debug("downloading byterange %s", byterange)
                     if byterange is not None:
                         if len(byterange) > 1:
                             if byterange[0] >= byterange[1]:
@@ -251,7 +251,9 @@ class S3Bucket():
                             if range['size'] is not None and byterange[0] >= range['size']:
                                 break
 
-                    result = self.s3client.getObject(bucketname=self.name, objectname=objectname, inputobject=_inputobject, byterange=byterange,  _inputIOWrapper=SimpleMd5FileObjectWriteWrapper)
+                    result = self.s3client.getObject(bucketname=self.name, objectname=objectname,
+                                                     inputobject=_inputobject, byterange=byterange,
+                                                     _inputIOWrapper=SimpleMd5FileObjectWriteWrapper)
                     range['end'] = result['range']['end']
                     range['size'] = result['range']['size']
                     if _inputobject is None:
@@ -277,19 +279,21 @@ class S3Bucket():
 
         if byterange is not None and len(byterange) > 1:
             if byterange[1] != range['end']:
-                raise IntegrityCheckException('size mismatch')
+                raise IntegrityCheckException('downloadArbitrarySizedObject: unexpected object size',
+                                              byterange[1], range['end'])
         else:
             if range['size'] != range['end'] + 1:
-                raise IntegrityCheckException('size mismatch')
-
+                raise IntegrityCheckException('downloadArbitrarySizedObject: unexpected object size',
+                                              byterange[1], range['end'] + 1)
 
         etag = result['ETag'][1:-1]
         if hashcheck:
             if '-' in etag:
-                print("warning: this is a multipart upload")
+                self.logger.debug("multipart upload, can't check for integrity by ETag")
             else:
                 if etag != _inputobject.getMd5HexDigest():
-                    raise IntegrityCheckException('invalid download hash')
+                    raise IntegrityCheckException('downloadArbitrarySizedObject returned unexpected ETag',
+                                                  etag, _inputobject.getMd5HexDigest())
             _inputobject = _inputobject.obj
 
         if closeinputobject:

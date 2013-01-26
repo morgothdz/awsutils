@@ -257,7 +257,7 @@ def signRequest(access_key, secret_key, endpoint, region=None, service=None,
         canonicalRequest = canonicalRequestS3Rest(method=method, uri=uri, headers=headers, query=query,
                                                   expires=expires)
 
-        print("canonicalRequest", canonicalRequest)
+        #print("canonicalRequest", canonicalRequest)
 
         headers["Authorization"] = 'AWS %s:%s' % (
             access_key,

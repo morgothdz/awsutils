@@ -219,4 +219,5 @@ class SQSClient(AWSClient):
             md5.update(messageBody)
             md5calculated = md5.hexdigest()
             if md5message != md5calculated:
-                raise IntegrityCheckException("sent message md5 doesn't match the calculated one")
+                raise IntegrityCheckException("sendMessage unexpected MD5OfMessageBody received",
+                                              md5message, md5calculated)
