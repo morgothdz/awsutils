@@ -1,5 +1,5 @@
 # awsutils/s3/client.py
-# Copyright 2013 Attila Gerendi
+# Copyright 2013 Sandor Attila Gerendi (Sanyi)
 #
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
@@ -22,8 +22,10 @@ import awsutils.utils.auth as authutils
 class UserInputException(Exception):
     pass
 
+
 class IntegrityCheckException(Exception):
     pass
+
 
 class AWSException(Exception):
     """exceptions raised on amazon error responses"""
@@ -123,10 +125,10 @@ class AWSClient:
         return conn
 
     def request(self, method='GET', host=None, uri='/', headers=None, query=None, body=b'',
-                region= None, service=None,
+                region=None, service=None,
                 expires=None,
                 date=time.gmtime(),
-                signmethod = None,
+                signmethod=None,
                 statusexpected=None,
                 xmlexpected=True,
                 inputobject=None,
@@ -134,10 +136,9 @@ class AWSClient:
                 retry=None,
                 receptiontimeout=None,
                 _inputIOWrapper=None):
-
         if retry is None: retry = self.HTTP_CONNECTION_RETRY_NUMBER
         if receptiontimeout is None: receptiontimeout = self.HTTP_RECEPTION_TIMEOUT
-        if host is None: host=self.endpoint
+        if host is None: host = self.endpoint
 
         _redirectcount = 0
         _retrycount = 0
@@ -192,8 +193,8 @@ class AWSClient:
             if xmlexpected or ('Content-Type' in response.headers and
                                response.headers['Content-Type'] == 'application/xml'):
                 handler = AWSXMLHandler()
-                incr_parser = xml.sax.make_parser()
-                incr_parser.setContentHandler(handler)
+                incrementalParser = xml.sax.make_parser()
+                incrementalParser.setContentHandler(handler)
 
                 doretry = False
                 while True:
@@ -211,7 +212,7 @@ class AWSClient:
                     if len(data) == 0:
                         break
                     print(">>", data)
-                    incr_parser.feed(data)
+                    incrementalParser.feed(data)
                 if doretry:
                     continue
 
@@ -221,7 +222,7 @@ class AWSClient:
                     try:
                         #TODO: we should differentiate between temporary and permanent redirect,
                         #and handle correctly the second
-                        if awsresponse['Error']['Code'] in ('TemporaryRedirect', 'PermanentRedirect'):
+                        if awsresponse['Error']['Code'] in ('TemporaryRedirect', 'PermanentRedirect', 'Redirect'):
                             redirect = awsresponse['Error']['Endpoint']
                             if _redirectcount < 3:
                                 _redirectcount += 1
@@ -229,6 +230,10 @@ class AWSClient:
                                 continue
                     except:
                         pass
+
+                if 'Error' in awsresponse and hasattr(self, 'EXCEPTIONS') and awsresponse['Error'][
+                                                                              'Code'] in self.EXCEPTIONS:
+                    raise self.EXCEPTIONS[awsresponse['Error']['Code']](awsresponse)
 
                 if response.status not in statusexpected:
                     #TODO: maybe we should retry on some status?
@@ -248,11 +253,11 @@ class AWSClient:
                 if response.status not in statusexpected:
                     #TODO: maybe we should retry on some status?
                     raise AWSDataException('unexpected status', response.status, response.reason,
-                        dict(response.headers), data)
+                                           dict(response.headers), data)
 
                 if 'Content-Length' not in response.headers:
                     raise AWSDataException('missing content length', response.status, response.reason,
-                        dict(response.headers), data)
+                                           dict(response.headers), data)
 
             #if we are here then most probably we want to download some data
             size = int(response.headers['Content-Length'])
@@ -287,8 +292,8 @@ class AWSClient:
                         # don't loose partial data yet, it may be useful even in this situation
                         sizeinfo['downloaded'] = ammount
                         raise AWSPartialReception(status=response.status, reason=response.reason,
-                            headers=dict(response.headers), data=inputobject, sizeinfo=sizeinfo,
-                            exception=e)
+                                                  headers=dict(response.headers), data=inputobject, sizeinfo=sizeinfo,
+                                                  exception=e)
 
                     # TODO: not all exception should retry, maybe an exception white list would be the way to go
                     if _retrycount < retry:

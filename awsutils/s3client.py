@@ -1,5 +1,5 @@
 # awsutils/s3/s3client.py
-# Copyright 2013 Attila Gerendi
+# Copyright 2013 Sandor Attila Gerendi (Sanyi)
 #
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
@@ -7,20 +7,54 @@
 import binascii, base64, json
 from awsutils.client import AWSClient, UserInputException, IntegrityCheckException
 from awsutils.utils.auth import SIGNATURE_S3_REST
+from awsutils.utils.exceptions import generateExceptionDict
 
 
 class S3Exception(Exception):
     pass
 
+class AWSS3Exception_AccessDenied(Exception):
+    HTTP_STATUS = 403
+    MESSAGE = 'Access Denied'
+
+class AWSS3Exception_AccountProblem(Exception):
+    HTTP_STATUS = 403
+    MESSAGE = 'There is a problem with your AWS account that prevents the operation from completing successfully.'
+
+class AWSS3Exception_AmbiguousGrantByEmailAddress(Exception):
+    HTTP_STATUS = 400
+    MESSAGE = 'The e-mail address you provided is associated with more than one account.'
+
+class AWSS3Exception_BadDigest(Exception):
+    HTTP_STATUS = 400
+    MESSAGE = 'The Content-MD5 you specified did not match what we received.'
+
+class AWSException_BucketAlreadyExists(Exception):
+    HTTP_STATUS = 409
+    MESSAGE = 'The requested bucket name is not available. The bucket namespace is shared by all users of the system.' \
+              ' Please select a different name and try again.'
+
+class AWSS3Exception_BucketAlreadyOwnedByYou(Exception):
+    HTTP_STATUS = 409
+    MESSAGE = 'Your previous request to create the named bucket succeeded and you already own it.'
+
+class AWSS3Exception_BucketNotEmpty(Exception):
+    HTTP_STATUS = 409
+    MESSAGE = 'The bucket you tried to delete is not empty.'
+
+class AWSS3Exception_CredentialsNotSupported(Exception):
+    HTTP_STATUS = 400
+    MESSAGE = 'This request does not support credentials.'
+
+class AWSS3Exception_SignatureDoesNotMatch(Exception):
+    HTTP_STATUS = 403
+    MESSAGE = 'The request signature we calculated does not match the signature you provided.'
 
 class S3Client(AWSClient):
-    def _buketname2PathAndEndpoint(self, bucketname):
-        if bucketname != bucketname.lower():
-            return  "/" + bucketname + "/", self.endpoint
-        return '/', bucketname + "." + self.endpoint
 
+    EXCEPTIONS = generateExceptionDict(__name__, exceptionprefix = 'AWSS3Exception_')
 
-    #==================================== operations on the service =======================================
+    #==================================== operations on the service ====================================================
     def getService(self):
         _status, _reason, _headers, data = self.request(method='GET', uri='/', signmethod=SIGNATURE_S3_REST)
         buckets = data['ListAllMyBucketsResult']['Buckets']['Bucket']
@@ -28,7 +62,7 @@ class S3Client(AWSClient):
         return data['ListAllMyBucketsResult']
 
 
-    #==================================== operations on the buckets =======================================
+    #==================================== operations on the buckets ====================================================
     def deleteBucket(self, bucketname):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
         self.request(method="DELETE", uri=uri, host=endpoint, statusexpected=[204], signmethod=SIGNATURE_S3_REST)
@@ -126,7 +160,7 @@ class S3Client(AWSClient):
                                                         statusexpected=[204], query={'policy': None},
                                                         signmethod=SIGNATURE_S3_REST)
 
-    #==================================== operations on the objects =======================================
+    #==================================== operations on the objects ====================================================
     def deleteObject(self, bucketname, objectname, versionID=None, x_amz_mfa=None):
         headers = {}
         query = {}
@@ -160,7 +194,8 @@ class S3Client(AWSClient):
         """
         range = list(start, end)
         inputbuffer = be any object implementing write(bytes)
-        if no inputbuffer is provided then the response will be depending on the response size an io.BytesIO or a tempfile.TemporaryFile opened to mode w+b 
+        if no inputbuffer is provided then the response will be depending on the response size an io.BytesIO or a
+        tempfile.TemporaryFile opened to mode w+b
         """
         query = {}
         if versionID is not None:
@@ -411,3 +446,9 @@ class S3Client(AWSClient):
         if data['Bucket'] != bucketname or data['Key'] != objectname:
             raise S3Exception('invalid-bucket-key', data, bucketname, objectname)
         return data
+
+    #================================== helper functions ===============================================================
+    def _buketname2PathAndEndpoint(self, bucketname):
+        if bucketname != bucketname.lower():
+            return  "/" + bucketname + "/", self.endpoint
+        return '/', bucketname + "." + self.endpoint

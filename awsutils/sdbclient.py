@@ -1,5 +1,5 @@
 # awsutils/sdbclient.py
-# Copyright 2013 Attila Gerendi
+# Copyright 2013 Sandor Attila Gerendi (Sanyi)
 #
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php

@@ -2,7 +2,7 @@
 
 ## Creator & Maintainer
 
-* Attila Gerendi <attila.gerendi@gmail.com>
+*Sandor Attila Gerendi <a.gerendi@gmail.com>
 
 
 ## Contributors
