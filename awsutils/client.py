@@ -19,28 +19,26 @@ except ImportError:  # Doesn't exist on OSX and other platforms
 from awsutils.utils.xmlhandler import AWSXMLHandler
 import awsutils.utils.auth as authutils
 
-class UserInputException(Exception):
-    pass
-
-
-class IntegrityCheckException(Exception):
-    def __int__(self, message, received = None, expected = None):
-        Exception.__init__(self, message)
-        self.received = received
-        self.expected = expected
-
 class AWSException(Exception):
     """exceptions raised on amazon error responses"""
-
-    def __init__(self, status, reason, headers, response):
+    def __init__(self, errorResponse, status, reason, headers):
+        Exception.__init__(self, errorResponse)
         self.status = status
         self.reason = reason
         self.headers = headers
-        self.response = response
+        self.errorResponse = errorResponse
+    def __str__(self):
+        return "%s-%s: %s"%(self.status, self.errorResponse['Error']['Code'],
+                             self.errorResponse['Error']['Message'])
 
-    def __repr__(self):
-        return repr(self.__dict__)
+class UserInputException(Exception):
+    pass
 
+class IntegrityCheckException(Exception):
+    def __init__(self, message, received = None, expected = None):
+        Exception.__init__(self, message)
+        self.received = received
+        self.expected = expected
 
 class AWSDataException(Exception):
     def __init__(self, message, status, reason, headers, data):
@@ -49,7 +47,6 @@ class AWSDataException(Exception):
         self.reason = reason
         self.headers = headers
         self.data = data
-
     def __repr__(self):
         return repr(self.__dict__)
 
@@ -234,13 +231,17 @@ class AWSClient:
                     except:
                         pass
 
-                if 'Error' in awsresponse and hasattr(self, 'EXCEPTIONS') and awsresponse['Error'][
-                                                                              'Code'] in self.EXCEPTIONS:
-                    raise self.EXCEPTIONS[awsresponse['Error']['Code']](awsresponse)
-
                 if response.status not in statusexpected:
                     #TODO: maybe we should retry on some status?
-                    raise AWSException(response.status, response.reason, dict(response.headers), awsresponse)
+                    if 'Error' in awsresponse:
+                        if hasattr(self, 'EXCEPTIONS') and awsresponse['Error']['Code'] in self.EXCEPTIONS:
+                            raise self.EXCEPTIONS[awsresponse['Error']['Code']](awsresponse, response.status,
+                                                                                response.reason, dict(response.headers))
+                        else:
+                            raise AWSException(awsresponse, response.status, response.reason, dict(response.headers))
+                    else:
+                        raise AWSDataException('unexpected status', response.status, response.reason,
+                                                dict(response.headers), data)
 
                 return response.status, response.reason, dict(response.headers), awsresponse
 

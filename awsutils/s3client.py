@@ -5,61 +5,61 @@
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 import binascii, base64, json
-from awsutils.client import AWSClient, UserInputException, IntegrityCheckException
+from awsutils.client import AWSClient, UserInputException, IntegrityCheckException, AWSException
 from awsutils.utils.auth import SIGNATURE_S3_REST
 from awsutils.utils.exceptions import generateExceptionDictionary
 
 
-class AWSS3Exception_AccessDenied(Exception):
+class AWSS3Exception_AccessDenied(AWSException):
     #Access Denied
     HTTP_STATUS = 403
 
-class AWSS3Exception_AccountProblem(Exception):
+class AWSS3Exception_AccountProblem(AWSException):
     #There is a problem with your AWS account that prevents the operation from completing successfully
     HTTP_STATUS = 403
 
-class AWSS3Exception_AmbiguousGrantByEmailAddress(Exception):
+class AWSS3Exception_AmbiguousGrantByEmailAddress(AWSException):
     #The e-mail address you provided is associated with more than one account
     HTTP_STATUS = 400
 
-class AWSS3Exception_BadDigest(Exception):
+class AWSS3Exception_BadDigest(AWSException):
     #The Content-MD5 you specified did not match what we received
     HTTP_STATUS = 400
 
-class AWSException_BucketAlreadyExists(Exception):
+class AWSS3Exception_BucketAlreadyExists(AWSException):
     #The requested bucket name is not available. The bucket namespace is shared by all users of the system
     HTTP_STATUS = 409
 
-class AWSS3Exception_BucketAlreadyOwnedByYou(Exception):
+class AWSS3Exception_BucketAlreadyOwnedByYou(AWSException):
     #Your previous request to create the named bucket succeeded and you already own it
     HTTP_STATUS = 409
 
-class AWSS3Exception_BucketNotEmpty(Exception):
+class AWSS3Exception_BucketNotEmpty(AWSException):
     #The bucket you tried to delete is not empty
     HTTP_STATUS = 409
 
-class AWSS3Exception_CredentialsNotSupported(Exception):
+class AWSS3Exception_CredentialsNotSupported(AWSException):
     #This request does not support credentials
     HTTP_STATUS = 400
 
-class AWSS3Exception_CredentialsNotSupported(Exception):
+class AWSS3Exception_CredentialsNotSupported(AWSException):
     #This request does not support credentials
     HTTP_STATUS = 400
 
-class AWSS3Exception_CrossLocationLoggingProhibited(Exception):
+class AWSS3Exception_CrossLocationLoggingProhibited(AWSException):
     #Cross location logging not allowed. Buckets in one geographic location cannot log information to a
     #bucket in another location
     HTTP_STATUS = 403
 
-class AWSS3Exception_EntityTooSmall(Exception):
+class AWSS3Exception_EntityTooSmall(AWSException):
     #Your proposed upload is smaller than the minimum allowed object size
     HTTP_STATUS = 400
 
-class AWSS3Exception_EntityTooLarge(Exception):
+class AWSS3Exception_EntityTooLarge(AWSException):
     #Your proposed upload exceeds the maximum allowed object size
     HTTP_STATUS = 400
 
-class AWSS3Exception_ExpiredToken(Exception):
+class AWSS3Exception_ExpiredToken(AWSException):
     #The provided token has expired
     HTTP_STATUS = 400
 
@@ -67,7 +67,11 @@ class AWSS3Exception_IllegalVersioningConfigurationException(Exception):
     #Indicates that the Versioning configuration specified in the request is invalid
     HTTP_STATUS = 400
 
-class AWSS3Exception_SignatureDoesNotMatch(Exception):
+class AWSS3Exception_NoSuchBucket(AWSException):
+    #The specified bucket does not exist.
+    HTTP_STATUS = 404
+
+class AWSS3Exception_SignatureDoesNotMatch(AWSException):
     #The request signature we calculated does not match the signature you provided
     HTTP_STATUS = 403
 
