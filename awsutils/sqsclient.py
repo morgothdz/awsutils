@@ -5,11 +5,23 @@
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 import hashlib
-from awsutils.client import AWSClient, UserInputException, IntegrityCheckException
+from awsutils.client import AWSClient, UserInputException, IntegrityCheckException, AWSException
 from awsutils.iamclient import IAMClient
 from awsutils.utils.auth import SIGNATURE_V4_HEADERS
+from awsutils.utils.exceptions import generateExceptionDictionary
+
+class AWSSQSException_AccessDenied(AWSException):
+    #Access to the resource is denied
+    HTTP_STATUS = 403
+
+class AWSSQSException_AuthFailure(AWSException):
+    #A value used for authentication could not be validated, such as Signature
+    HTTP_STATUS = 403
 
 class SQSClient(AWSClient):
+
+    EXCEPTIONS = generateExceptionDictionary(__name__, exceptionprefix = 'AWSSQSException_')
+
     def __init__(self, endpoint, access_key, secret_key, accNumber=None, secure=False):
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
         #try to retrieve the curent user's account number
