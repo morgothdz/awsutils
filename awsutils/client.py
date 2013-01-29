@@ -106,7 +106,8 @@ class AWSClient:
 
     def getConnection(self, destination, port=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
         #TODO: if there is need we can implement here proxy and socks proxy support
-        #TODO: for have this lib thread safe we should bind the current thread to the connection pool key so each thread will have separate connection
+        #TODO: for having this module thread safe we should bind the current thread to the connection pool key so each
+        # thread will have separate connection
         if destination in self.connections:
             if self.is_connection_usable(self.connections[destination]) and (
                 self.connections[destination]._HTTPConnection__state == http.client._CS_IDLE):
@@ -116,7 +117,7 @@ class AWSClient:
 
         self.logger.debug("connecting to %s", destination)
         if self.secure:
-            #TODO: https contex checking
+            #TODO: https contex (cerificate) checking
             conn = http.client.HTTPSConnection(destination, timeout=timeout)
         else:
             conn = http.client.HTTPConnection(destination, timeout=timeout)
