@@ -18,6 +18,14 @@ class AWSSQSException_AuthFailure(AWSException):
     #A value used for authentication could not be validated, such as Signature
     HTTP_STATUS = 403
 
+SQS_PERMISSIONS = {'*', 'SendMessage', 'ReceiveMessage', 'DeleteMessage', 'ChangeMessageVisibility',
+                   'GetQueueAttributes', 'GetQueueUrl'}
+
+SQS_QUEUE_ATTRIBUTES = {'All', 'ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible',
+                        'ApproximateNumberOfMessagesDelayed', 'VisibilityTimeout', 'CreatedTimestamp',
+                        'LastModifiedTimestamp', 'Policy', 'MaximumMessageSize', 'MessageRetentionPeriod',
+                        'QueueArn', 'ReceiveMessageWaitTimeSeconds', 'DelaySeconds'}
+
 class SQSClient(AWSClient):
 
     EXCEPTIONS = generateExceptionDictionary(__name__, exceptionprefix = 'AWSSQSException_')
@@ -34,9 +42,25 @@ class SQSClient(AWSClient):
         else:
             self.accNumber = accNumber
 
-    def addPermission(self, qName, accNumber, permissions, endpoint=None):
-        #TODO: implement
-        pass
+    def addPermission(self, qName, label, permissions, endpoint=None, accNumber=None):
+        """
+        @param permissions: dictionary {accoundid:actionname}
+        @type permissions: dict
+        """
+        if endpoint is None: endpoint = self.endpoint
+        if accNumber is None: accNumber = self.accNumber
+        query ={'Action':'AddPermission', 'Label':label, 'Version':'2012-11-05'}
+        i = 1
+        for accountid in permissions:
+            if permissions[accountid] not in SQS_PERMISSIONS:
+                raise UserInputException('unknown action')
+            query['AWSAccountId.%d'%(i,)] = accountid
+            query['ActionName.%d'%(i,)] = permissions[accountid]
+            i += 1
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
+                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
+                                                        uri="/%s/%s" % (accNumber, qName))
+        data['AddPermissionResponse']
 
     def changeMessageVisibility(self, qName, receiptHandle, visibilityTimeout, accNumber=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
@@ -48,15 +72,28 @@ class SQSClient(AWSClient):
         _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
                                                         region=endpoint[4:-14], service='sqs', host=endpoint,
                                                         uri="/%s/%s" % (accNumber, qName))
-        data['ChangeMessageVisibilityResponse']
+        return data['ChangeMessageVisibilityResponse']
 
-    def changeMessageVisibilityBatch(self, qname, accNumber=None, endpoint=None):
-        #TODO: implement
+    def changeMessageVisibilityBatch(self, qName, receipts, accNumber=None, endpoint=None):
         """
-        &ChangeMessageVisibilityBatchRequestEntry.1.Id=change_visibility_msg_2
-        &ChangeMessageVisibilityBatchRequestEntry.1.ReceiptHandle=Your_Receipt_Handle
-        &ChangeMessageVisibilityBatchRequestEntry.1.VisibilityTimeout=45
+        @param receipts: dictionary {receiptHandle:visibilityTimeout}
+        @type receipts: dict
         """
+        if endpoint is None: endpoint = self.endpoint
+        if accNumber is None: accNumber = self.accNumber
+        query ={'Action':'ChangeMessageVisibilityBatch', 'Version': '2012-11-05'}
+        i = 1
+        for receiptHandle in receipts:
+            if receipts[receiptHandle] > 43200:
+                raise UserInputException('param visibilityTimeout too big (max 43200 seconds)')
+            query['ChangeMessageVisibilityBatchRequestEntry.%s.Id'%(i,)] = 'msg%s'%(i,)
+            query['ChangeMessageVisibilityBatchRequestEntry.%s.ReceiptHandle'%(i,)] = receiptHandle
+            query['ChangeMessageVisibilityBatchRequestEntry.%s.VisibilityTimeout'%(i,)] = receipts[receiptHandle]
+            i += 1
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
+                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
+                                                        uri="/%s/%s" % (accNumber, qName))
+        return data['ChangeMessageVisibilityBatchResponse']
 
     def createQueue(self, queueName, delaySeconds=None, maximumMessageSize=None, messageRetentionPeriod=None,
                     receiveMessageWaitTimeSeconds=None, visibilityTimeout=None, policy=None, endpoint=None):
@@ -108,6 +145,30 @@ class SQSClient(AWSClient):
         else: url = url[7:]
         url = url.split('/')
         return {'endpoint': url[0], 'accNumber': url[1], 'qName': url[2]}
+
+    def deleteQueue(self, qName, accNumber=None, endpoint=None):
+        if endpoint is None: endpoint = self.endpoint
+        if accNumber is None: accNumber = self.accNumber
+        query ={'Action':'DeleteQueue', 'Version': '2012-11-05'}
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
+                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
+                                                        uri="/%s/%s" % (accNumber, qName))
+        data['DeleteQueueResponse']
+
+    def getQueueAttributes(self, qName, attributes = ['All'], accNumber=None, endpoint=None):
+        if endpoint is None: endpoint = self.endpoint
+        if accNumber is None: accNumber = self.accNumber
+        query ={'Action':'GetQueueAttributes', 'Version': '2012-11-05'}
+        i = 1
+        for attribute in attributes:
+            if attribyte not in SQS_QUEUE_ATTRIBUTES:
+                raise UserInputException('unknown attribute')
+            query['AttributeName.%d'%(i,)] = attribute
+            i += 1
+        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
+                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
+                                                        uri="/%s/%s" % (accNumber, qName))
+        return data['GetQueueAttributesResponse']['GetQueueAttributesResult']['Attribute']
 
 
     def listQueues(self, queueNamePrefix=None, endpoint=None):
@@ -177,7 +238,6 @@ class SQSClient(AWSClient):
         data = data['ReceiveMessageResponse']['ReceiveMessageResult']
         if not isinstance(data, dict):
             return []
-            #example {'Body': 'sometext', 'ReceiptHandle': 'gH2...2e4=', 'MD5OfBody': '9d...dc', 'MessageId': '..'},
         if isinstance(data['Message'], dict):
             return data['Message']
         return data['Message']
