@@ -4,7 +4,7 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-def generateExceptionDictionary(modulename, exceptionprefix = 'AWSS3Exception_'):
+def generateExceptionDictionary(modulename, exceptionprefix):
     import inspect, sys
     result = {}
     l = len(exceptionprefix)
