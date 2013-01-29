@@ -4,7 +4,7 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-import binascii, base64, json
+import binascii, base64, json, hashlib
 from awsutils.client import AWSClient, UserInputException, IntegrityCheckException, AWSException
 from awsutils.utils.auth import SIGNATURE_S3_REST
 from awsutils.utils.exceptions import generateExceptionDictionary
@@ -462,8 +462,33 @@ class S3Client(AWSClient):
         """ojects can be: a list of  strings [object names] 
                           a list of dictionaries with name and vesionId keys
                           a list of objects with name and vesionId attributes"""
-        #TODO: implement
-        pass
+        requestbody = '<?xml version="1.0" encoding="UTF-8"?><Delete><Quiet>true</Quiet>\n'
+        if isinstance(objects, dict): objects = objects.items()
+        for item in objects:
+            if isinstance(item, str):
+                requestbody += "<Object><Key>%s</Key></Object>"%(item,)
+            else:
+                requestbody += "<Object><Key>%s</Key><VersionId>%s</VersionId></Object>"%(item[0],item[1])
+        requestbody += "</Delete>"
+        uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        md5 = hashlib.md5()
+        md5.update(requestbody.encode(encoding='utf-8', errors='strict'))
+        headers = {'Content-MD5':  base64.b64encode(md5.digest()).strip().decode()}
+        if x_amz_mfa is not None:
+            headers['x-amz-mfa'] = x_amz_mfa
+        status, _reason, headers, data = self.request(method="POST",
+                                                      uri=uri,
+                                                      headers=headers,
+                                                      host=endpoint,
+                                                      query={'delete':None},
+                                                      xmlexpected=True,
+                                                      body=requestbody,
+                                                      signmethod=SIGNATURE_S3_REST)
+        if data['DeleteResult'] == '':
+            return True
+        else:
+            return data['DeleteResult']['Error']
+
 
     def getObject(self, bucketname, objectname,
                   inputobject=None,
@@ -507,16 +532,16 @@ class S3Client(AWSClient):
             statusexpected.append(304)
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        status, _reason, headers, range, data = self.request(method="HEAD" if _doHeadRequest else "GET",
-                                                             uri=uri + objectname,
-                                                             headers=headers,
-                                                             host=endpoint,
-                                                             statusexpected=statusexpected,
-                                                             query=query,
-                                                             inputobject=inputobject,
-                                                             xmlexpected=False,
-                                                             _inputIOWrapper=_inputIOWrapper,
-                                                             signmethod=SIGNATURE_S3_REST)
+        status, _reason, headers, brange, data = self.request(method="HEAD" if _doHeadRequest else "GET",
+                                                              uri=uri + objectname,
+                                                              headers=headers,
+                                                              host=endpoint,
+                                                              statusexpected=statusexpected,
+                                                              query=query,
+                                                              inputobject=inputobject,
+                                                              xmlexpected=False,
+                                                              _inputIOWrapper=_inputIOWrapper,
+                                                              signmethod=SIGNATURE_S3_REST)
 
         result = dict((k, v) for k, v in headers.items() if k in ('ETag',
                                                                   'x-amz-delete-marker', 'x-amz-expiration',
@@ -525,7 +550,7 @@ class S3Client(AWSClient):
                                                                   'x-amz-website-redirect-location')
         or k.startswith('x-amz-meta-'))
         result['status'] = status
-        result['range'] = range
+        result['range'] = brange
         if status in (200, 206) and not _doHeadRequest:
             result['data'] = data
         return result
