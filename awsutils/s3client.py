@@ -63,17 +63,275 @@ class AWSS3Exception_ExpiredToken(AWSException):
     #The provided token has expired
     HTTP_STATUS = 400
 
-class AWSS3Exception_IllegalVersioningConfigurationException(Exception):
+class AWSS3Exception_IllegalVersioningConfigurationException(AWSException):
     #Indicates that the Versioning configuration specified in the request is invalid
     HTTP_STATUS = 400
 
+class AWSS3Exception_IncompleteBody(AWSException):
+    #You did not provide the number of bytes specified by the Content-Length HTTP header
+    HTTP_STATUS = 400
+
+class AWSS3Exception_IncorrectNumberOfFilesInPostRequest(AWSException):
+    #POST requires exactly one file upload per request.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InlineDataTooLarge(AWSException):
+    #Inline data exceeds the maximum allowed size.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InternalError(AWSException):
+    #We encountered an internal error. Please try again.
+    HTTP_STATUS = 500
+    
+class AWSS3Exception_InvalidAccessKeyId(AWSException):
+    #The AWS Access Key Id you provided does not exist in our records.
+    HTTP_STATUS = 403
+    
+class AWSS3Exception_InvalidAddressingHeader(AWSException):
+    #You must specify the Anonymous role.
+    HTTP_STATUS = None
+    
+class AWSS3Exception_InvalidArgument(AWSException):
+    #Invalid Argument
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidBucketName(AWSException):
+    #The specified bucket is not valid.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidBucketState(AWSException):
+    #The request is not valid with the current state of the bucket.
+    HTTP_STATUS = 409
+    
+class AWSS3Exception_InvalidDigest(AWSException):
+    #The Content-MD5 you specified was an invalid.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidLocationConstraint(AWSException):
+    #The specified location constraint is not valid. 
+    #For more information about Regions, see How to Select a Region for Your Buckets. 
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidObjectState(AWSException):
+    #The operation is not valid for the current state of the object.
+    HTTP_STATUS = 403
+    
+class AWSS3Exception_InvalidPart(AWSException):
+    #One or more of the specified parts could not be found. 
+    #The part might not have been uploaded, or the specified entity tag might not have matched the part's entity tag.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidPartOrder(AWSException):
+    #The list of parts was not in ascending order.Parts list must specified in order by part number.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidPayer(AWSException):
+    #All access to this object has been disabled.
+    HTTP_STATUS = 403
+    
+class AWSS3Exception_InvalidPolicyDocument(AWSException):
+    #The content of the form does not meet the conditions specified in the policy document.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidRange(AWSException):
+    #The requested range cannot be satisfied.
+    HTTP_STATUS = 416
+    
+class AWSS3Exception_InvalidRequest(AWSException):
+    #SOAP requests must be made over an HTTPS connection.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidSecurity(AWSException):
+    #The provided security credentials are not valid.
+    HTTP_STATUS = 403
+    
+class AWSS3Exception_InvalidSOAPRequest(AWSException):
+    #The SOAP request body is invalid.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidStorageClass(AWSException):
+    #The storage class you specified is not valid.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidTargetBucketForLogging(AWSException):
+    #The target bucket for logging does not exist, is not owned by you,
+    # or does not have the appropriate grants for the log-delivery group. 
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidToken(AWSException):
+    #The provided token is malformed or otherwise invalid.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_InvalidURI(AWSException):
+    #Couldn't parse the specified URI.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_KeyTooLong(AWSException):
+    #Your key is too long.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MalformedACLError(AWSException):
+    #The XML you provided was not well-formed or did not validate against our published schema.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MalformedPOSTRequest(AWSException):
+    #The body of your POST request is not well-formed multipart/form-data.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MalformedXML(AWSException):
+    #This happens when the user sends a malformed xml (xml that doesn't conform to the published xsd) for the configuration.
+    # The error message is, "The XML you provided was not well-formed or did not validate against our published schema." 
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MaxMessageLengthExceeded(AWSException):
+    #Your request was too big.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MaxPostPreDataLengthExceededError(AWSException):
+    #Your POST request fields preceding the upload file were too large.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MetadataTooLarge(AWSException):
+    #Your metadata headers exceed the maximum allowed metadata size.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MethodNotAllowed(AWSException):
+    #The specified method is not allowed against this resource.
+    HTTP_STATUS = 405
+    
+class AWSS3Exception_MissingAttachment(AWSException):
+    #A SOAP attachment was expected, but none were found.
+    HTTP_STATUS = None
+    
+class AWSS3Exception_MissingContentLength(AWSException):
+    #You must provide the Content-Length HTTP header.
+    HTTP_STATUS = 411
+    
+class AWSS3Exception_MissingRequestBodyError(AWSException):
+    #This happens when the user sends an empty xml document as a request.
+    # The error message is, "Request body is empty." 
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MissingSecurityElement(AWSException):
+    #The SOAP 1.1 request is missing a security element.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_MissingSecurityHeader(AWSException):
+    #Your request was missing a required header.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_NoLoggingStatusForKey(AWSException):
+    #There is no such thing as a logging status sub-resource for a key.
+    HTTP_STATUS = 400
+    
 class AWSS3Exception_NoSuchBucket(AWSException):
     #The specified bucket does not exist.
     HTTP_STATUS = 404
-
-class AWSS3Exception_SignatureDoesNotMatch(AWSException):
-    #The request signature we calculated does not match the signature you provided
+    
+class AWSS3Exception_NoSuchKey(AWSException):
+    #The specified key does not exist.
+    HTTP_STATUS = 404
+    
+class AWSS3Exception_NoSuchLifecycleConfiguration(AWSException):
+    #The lifecycle configuration does not exist. 
+    HTTP_STATUS = 404
+    
+class AWSS3Exception_NoSuchUpload(AWSException):
+    #The specified multipart upload does not exist.
+    # The upload ID might be invalid, or the multipart upload might have been aborted or completed.
+    HTTP_STATUS = 404
+    
+class AWSS3Exception_NoSuchVersion(AWSException):
+    #Indicates that the version ID specified in the request does not match an existing version.
+    HTTP_STATUS = 404
+    
+class AWSS3Exception_NotImplemented(AWSException):
+    #A header you provided implies functionality that is not implemented.
+    HTTP_STATUS = 501
+    
+class AWSS3Exception_NotSignedUp(AWSException):
+    #Your account is not signed up for the Amazon S3 service. You must sign up before you can use Amazon S3.
+    # You can sign up at the following URL: http://aws.amazon.com/s3
     HTTP_STATUS = 403
+    
+class AWSS3Exception_NotSuchBucketPolicy(AWSException):
+    #The specified bucket does not have a bucket policy.
+    HTTP_STATUS = 404
+    
+class AWSS3Exception_OperationAborted(AWSException):
+    #A conflicting conditional operation is currently in progress against this resource. Please try again.
+    HTTP_STATUS = 409
+    
+class AWSS3Exception_PermanentRedirect(AWSException):
+    #The bucket you are attempting to access must be addressed using the specified endpoint.
+    # Please send all future requests to this endpoint.
+    HTTP_STATUS = 301
+    
+class AWSS3Exception_PreconditionFailed(AWSException):
+    #At least one of the preconditions you specified did not hold.
+    HTTP_STATUS = 412
+    
+class AWSS3Exception_Redirect(AWSException):
+    #Temporary redirect.
+    HTTP_STATUS = 307
+    
+class AWSS3Exception_RestoreAlreadyInProgress(AWSException):
+    #Object restore is already in progress.
+    HTTP_STATUS = 409
+    
+class AWSS3Exception_RequestIsNotMultiPartContent(AWSException):
+    #Bucket POST must be of the enclosure-type multipart/form-data.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_RequestTimeout(AWSException):
+    #Your socket connection to the server was not read from or written to within the timeout period.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_RequestTimeTooSkewed(AWSException):
+    #The difference between the request time and the server's time is too large.
+    HTTP_STATUS = 403
+    
+class AWSS3Exception_RequestTorrentOfBucketError(AWSException):
+    #Requesting the torrent file of a bucket is not permitted.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_SignatureDoesNotMatch(AWSException):
+    #The request signature we calculated does not match the signature you provided.
+    # Check your AWS Secret Access Key and signing method.
+    # For more information, see REST Authentication and SOAP Authentication for details.
+    HTTP_STATUS = 403
+    
+class AWSS3Exception_ServiceUnavailable(AWSException):
+    #Please reduce your request rate.
+    HTTP_STATUS = 503
+    
+class AWSS3Exception_SlowDown(AWSException):
+    #Please reduce your request rate.
+    HTTP_STATUS = 503
+    
+class AWSS3Exception_TemporaryRedirect(AWSException):
+    #You are being redirected to the bucket while DNS updates.
+    HTTP_STATUS = 307
+    
+class AWSS3Exception_TokenRefreshRequired(AWSException):
+    #The provided token must be refreshed.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_TooManyBuckets(AWSException):
+    #You have attempted to create more buckets than allowed.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_UnexpectedContent(AWSException):
+    #This request does not support content.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_UnresolvableGrantByEmailAddress(AWSException):
+    #The e-mail address you provided does not match any account on record.
+    HTTP_STATUS = 400
+    
+class AWSS3Exception_UserKeyMustBeSpecified(AWSException):
+    #The bucket POST must contain the specified field name. If it is specified, please check the order of the fields.
+    HTTP_STATUS = 400
 
 class S3Client(AWSClient):
 
