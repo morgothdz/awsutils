@@ -42,7 +42,7 @@ class AWSStatusException(Exception):
     def __init__(self, data):
         Exception.__init__(self)
         self.data = data
-    def __repr__(self):
+    def __str__(self):
         return repr(self.__dict__)
 
 class AWSDataException(Exception):
@@ -50,7 +50,7 @@ class AWSDataException(Exception):
         Exception.__init__(self, message)
         self.message = message
         self.data = data
-    def __repr__(self):
+    def __str__(self):
         return repr(self.__dict__)
 
 class AWSTimeout(Exception):
