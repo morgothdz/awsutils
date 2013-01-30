@@ -17,5 +17,5 @@ class IAMClient(AWSClient):
         query = {'Action': 'GetUser', 'Version': '2010-05-08'}
         if userName is not None:
             query['UserName'] = userName
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query)
-        return data['GetUserResponse']['GetUserResult']['User']
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query)
+        return data['awsresponse']['GetUserResponse']['GetUserResult']['User']

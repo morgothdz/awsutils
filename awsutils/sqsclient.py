@@ -57,10 +57,10 @@ class SQSClient(AWSClient):
             query['AWSAccountId.%d'%(i,)] = accountid
             query['ActionName.%d'%(i,)] = permissions[accountid]
             i += 1
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        data['AddPermissionResponse']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
+                            region=endpoint[4:-14], service='sqs', host=endpoint,
+                            uri="/%s/%s" % (accNumber, qName))
+        data['awsresponse']['AddPermissionResponse']
 
     def changeMessageVisibility(self, qName, receiptHandle, visibilityTimeout, accNumber=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
@@ -69,10 +69,9 @@ class SQSClient(AWSClient):
             raise UserInputException('param visibilityTimeout too big (max 43200 seconds)')
         query = {'Action': 'ChangeMessageVisibility', 'ReceiptHandle': receiptHandle,
                  'VisibilityTimeout': visibilityTimeout, 'Version': '2012-11-05'}
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        return data['ChangeMessageVisibilityResponse']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
+        return data['awsresponse']['ChangeMessageVisibilityResponse']
 
     def changeMessageVisibilityBatch(self, qName, receipts, accNumber=None, endpoint=None):
         """
@@ -90,10 +89,9 @@ class SQSClient(AWSClient):
             query['ChangeMessageVisibilityBatchRequestEntry.%s.ReceiptHandle'%(i,)] = receiptHandle
             query['ChangeMessageVisibilityBatchRequestEntry.%s.VisibilityTimeout'%(i,)] = receipts[receiptHandle]
             i += 1
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        return data['ChangeMessageVisibilityBatchResponse']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
+        return data['awsresponse']['ChangeMessageVisibilityBatchResponse']
 
     def createQueue(self, queueName, delaySeconds=None, maximumMessageSize=None, messageRetentionPeriod=None,
                     receiveMessageWaitTimeSeconds=None, visibilityTimeout=None, policy=None, endpoint=None):
@@ -138,9 +136,9 @@ class SQSClient(AWSClient):
             i += 1
 
         #TODO: implement policy
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint)
-        url = data['CreateQueueResponse']['CreateQueueResult']['QueueUrl']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint)
+        url = data['awsresponse']['CreateQueueResponse']['CreateQueueResult']['QueueUrl']
         if url[7] == '/': url = url[8:]
         else: url = url[7:]
         url = url.split('/')
@@ -150,10 +148,9 @@ class SQSClient(AWSClient):
         if endpoint is None: endpoint = self.endpoint
         if accNumber is None: accNumber = self.accNumber
         query ={'Action':'DeleteQueue', 'Version': '2012-11-05'}
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        data['DeleteQueueResponse']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
+        data['awsresponse']['DeleteQueueResponse']
 
     def getQueueAttributes(self, qName, attributes = ['All'], accNumber=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
@@ -165,19 +162,18 @@ class SQSClient(AWSClient):
                 raise UserInputException('unknown attribute')
             query['AttributeName.%d'%(i,)] = attribute
             i += 1
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        return data['GetQueueAttributesResponse']['GetQueueAttributesResult']['Attribute']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,region=endpoint[4:-14],
+                             service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
+        return data['awsresponse']['GetQueueAttributesResponse']['GetQueueAttributesResult']['Attribute']
 
 
     def listQueues(self, queueNamePrefix=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'ListQueues', 'Version': '2012-11-05'}
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint)
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint)
         result = []
-        data = data['ListQueuesResponse']['ListQueuesResult']
+        data = data['awsresponse']['ListQueuesResponse']['ListQueuesResult']
         if 'QueueUrl' in data:
             urls = data['QueueUrl']
             if not isinstance(urls, list):
@@ -195,9 +191,9 @@ class SQSClient(AWSClient):
         query = {'Action': 'GetQueueUrl', 'QueueName': queueName, 'Version': '2012-11-05'}
         if queueOwnerAWSAccountId is not None:
             query['QueueOwnerAWSAccountId'] = queueOwnerAWSAccountId
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint)
-        data = data['GetQueueUrlResponse']['GetQueueUrlResult']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint)
+        data = data['awsresponse']['GetQueueUrlResponse']['GetQueueUrlResult']
         if 'QueueUrl' in data:
             url = data['QueueUrl']
             if url[7] == '/': url = url[8:]
@@ -232,10 +228,9 @@ class SQSClient(AWSClient):
             for i in range(0, len(attributes)):
                 query['AttributeName.%d' % (i + 1,)] = attributes[i]
 
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        data = data['ReceiveMessageResponse']['ReceiveMessageResult']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
+        data = data['awsresponse']['ReceiveMessageResponse']['ReceiveMessageResult']
         if not isinstance(data, dict):
             return []
         if isinstance(data['Message'], dict):
@@ -246,10 +241,9 @@ class SQSClient(AWSClient):
         if endpoint is None: endpoint = self.endpoint
         if accNumber is None: accNumber = self.accNumber
         query = {'Action': 'DeleteMessage', 'ReceiptHandle': receiptHandle, 'Version': '2012-11-05'}
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        data['DeleteMessageResponse']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
+        data['awsresponse']['DeleteMessageResponse']
 
     def deleteMessageBatch(self, qName, receiptHandles, accNumber=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
@@ -259,10 +253,9 @@ class SQSClient(AWSClient):
         for receiptHandle in receiptHandles:
             query['DeleteMessageBatchRequestEntry.%d.Id'%(i,)] = 'id-%d'%(i,)
             query['DeleteMessageBatchRequestEntry.%d.ReceiptHandle'%(i,)] = receiptHandle
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        data = data['<DeleteMessageBatchResponse']['DeleteMessageBatchResult']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
+        data = data['awsresponse']['DeleteMessageBatchResponse']['DeleteMessageBatchResult']
         if isinstance(data, str):
             return []
         data = data['DeleteMessageBatchResultEntry']
@@ -281,10 +274,9 @@ class SQSClient(AWSClient):
             if delaySeconds > 900:
                 raise UserInputException('param delaySeconds too big (max 900 seconds)')
             query['DelaySeconds'] = delaySeconds
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
-                                                        region=endpoint[4:-14], service='sqs', host=endpoint,
-                                                        uri="/%s/%s" % (accNumber, qName))
-        md5message = data['SendMessageResponse']['SendMessageResult']['MD5OfMessageBody']
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=endpoint[4:-14],
+                             service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
+        md5message = data['awsresponse']['SendMessageResponse']['SendMessageResult']['MD5OfMessageBody']
         if hashcheck:
             messageBody = messageBody.encode(encoding='utf8')
             md5 = hashlib.md5()

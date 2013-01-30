@@ -32,8 +32,8 @@ class SimpleDBClient(AWSClient):
                 query['Item.%d.Attribute.%d.value'%(i,a)] = items[itemName][attributeName]
                 a += 1
             i += 1
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['BatchDeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['BatchDeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
 
     def batchPutAttributes(self, domainName, items, endpoint=None):
@@ -65,31 +65,31 @@ class SimpleDBClient(AWSClient):
                     query['Item.%d.Attribute.%d.value'%(i,a)] = v
                 a += 1
             i += 1
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['BatchPutAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['BatchPutAttributesResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
 
     def createDomain(self, domainName, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'CreateDomain', 'DomainName':domainName, 'Version': '2009-04-15'}
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['CreateDomainResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['CreateDomainResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
 
     def deleteDomain(self, domainName, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'DeleteDomain', 'DomainName':domainName, 'Version': '2009-04-15'}
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['DeleteDomainResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['DeleteDomainResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
 
     def domainMetadata(self, domainName, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'DomainMetadata', 'DomainName':domainName, 'Version': '2009-04-15'}
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['DomainMetadataResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['DomainMetadataResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
-        return data['DomainMetadataResponse']['DomainMetadataResult']
+        return data['awsresponse']['DomainMetadataResponse']['DomainMetadataResult']
 
     def listDomains(self, maxNumberOfDomains=None, nextToken=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
@@ -100,10 +100,10 @@ class SimpleDBClient(AWSClient):
             query['MaxNumberOfDomains'] = maxNumberOfDomains
         if nextToken is not None:
             query['NextToken'] = nextToken
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['ListDomainsResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['ListDomainsResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
-        data = data['ListDomainsResponse']['ListDomainsResult']
+        data = data['awsresponse']['ListDomainsResponse']['ListDomainsResult']
         result = []
         if 'DomainName' in data:
             result = data['DomainName']
@@ -118,10 +118,10 @@ class SimpleDBClient(AWSClient):
             query['ConsistentRead'] = consistentRead
         if nextToken is not None:
             query['NextToken'] = nextToken
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['SelectResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['SelectResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
-        data = data['SelectResponse']['SelectResult']
+        data = data['awsresponse']['SelectResponse']['SelectResult']
         if isinstance(data, str): return []
         data = data['Item']
         if isinstance(data, dict): return [data]
@@ -134,9 +134,9 @@ class SimpleDBClient(AWSClient):
             query['AttributeName'] = attributeName
         if consistentRead is not None:
             query['ConsistentRead'] = consistentRead
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['GetAttributesResponse']['ResponseMetadata']['BoxUsage'])
-        data = data['GetAttributesResponse']['GetAttributesResult']
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['GetAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        data = data['awsresponse']['GetAttributesResponse']['GetAttributesResult']
         if isinstance(data, str):
             return None
         data = data['Attribute']
@@ -158,8 +158,8 @@ class SimpleDBClient(AWSClient):
                 query['Expected.%d.Value'%(i,)] = expected[name][0]
                 query['Expected.%d.Exists'%(i,)] = expected[name][1]
                 i += 1
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['PutAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['PutAttributesResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
 
 
@@ -178,6 +178,6 @@ class SimpleDBClient(AWSClient):
                 query['Expected.%d.Value'%(i,)] = expected[name][0]
                 query['Expected.%d.Exists'%(i,)] = expected[name][1]
                 i += 1
-        _status, _reason, _headers, data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
-        boxUsage = float(data['DeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
+        boxUsage = float(data['awsresponse']['DeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage

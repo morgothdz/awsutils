@@ -21,14 +21,12 @@ import awsutils.utils.auth as authutils
 
 class AWSException(Exception):
     """exceptions raised on amazon error responses"""
-    def __init__(self, errorResponse, status, reason, headers):
+    def __init__(self, errorResponse, data):
         Exception.__init__(self, errorResponse)
-        self.status = status
-        self.reason = reason
-        self.headers = headers
         self.errorResponse = errorResponse
+        self.data = data
     def __str__(self):
-        return "%s-%s: %s"%(self.status, self.errorResponse['Error']['Code'],
+        return "%s-%s: %s"%(self.data['status'], self.errorResponse['Error']['Code'],
                              self.errorResponse['Error']['Message'])
 
 class UserInputException(Exception):
@@ -40,12 +38,17 @@ class IntegrityCheckException(Exception):
         self.received = received
         self.expected = expected
 
+class AWSStatusException(Exception):
+    def __init__(self, data):
+        Exception.__init__(self)
+        self.data = data
+    def __repr__(self):
+        return repr(self.__dict__)
+
 class AWSDataException(Exception):
-    def __init__(self, message, status, reason, headers, data):
+    def __init__(self, message, data):
+        Exception.__init__(self, message)
         self.message = message
-        self.status = status
-        self.reason = reason
-        self.headers = headers
         self.data = data
     def __repr__(self):
         return repr(self.__dict__)
@@ -137,6 +140,7 @@ class AWSClient:
                 retry=None,
                 receptiontimeout=None,
                 _inputIOWrapper=None):
+
         if retry is None: retry = self.HTTP_CONNECTION_RETRY_NUMBER
         if receptiontimeout is None: receptiontimeout = self.HTTP_RECEPTION_TIMEOUT
         if host is None: host = self.endpoint
@@ -192,7 +196,35 @@ class AWSClient:
             data = None
 
             if xmlexpected or ('Content-Type' in response.headers and
-                               response.headers['Content-Type'] == 'application/xml'):
+                               response.headers['Content-Type'] in ('application/xml', 'text/xml')):
+
+                if xmlexpected and not('Content-Type' in response.headers and
+                                       response.headers['Content-Type'] in ('application/xml', 'text/xml')):
+                    try:
+                        data = response.read(1024)
+                        while response.read(32768) != b'':
+                            pass
+                    except:
+                        pass
+                    resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
+                                  'data':data, 'type':'error'}
+                    raise AWSDataException('xml expected', resultdata)
+
+
+                if ('Content-Length' not in response.headers) and ('Transfer-Encoding' not in response.headers or
+                                                                   response.headers['Transfer-Encoding'] != 'chunked'):
+                #every non xml response should have  'Content-Length' set or be chunked
+                #take a peek of the data then consume the rest of it
+                    try:
+                        data = response.read(1024)
+                        while response.read(32768) != b'':
+                            pass
+                    except:
+                        pass
+                    resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
+                                  'data':data, 'type':'error'}
+                    raise AWSDataException('missing content length', resultdata)
+
                 handler = AWSXMLHandler()
                 incrementalParser = xml.sax.make_parser()
                 incrementalParser.setContentHandler(handler)
@@ -219,50 +251,64 @@ class AWSClient:
 
                 awsresponse = handler.getdict()
 
-                if 300 <= response.status < 400:
-                    try:
-                        #TODO: we should differentiate between temporary and permanent redirect,
-                        #and handle correctly the second
-                        if awsresponse['Error']['Code'] in ('TemporaryRedirect', 'PermanentRedirect', 'Redirect'):
-                            redirect = awsresponse['Error']['Endpoint']
-                            if _redirectcount < 3:
-                                _redirectcount += 1
-                                host = redirect
-                                continue
-                    except:
-                        pass
-
-                if response.status not in statusexpected:
-                    #TODO: maybe we should retry on some status?
+                if awsresponse is not None:
+                    if 300 <= response.status < 400:
+                        try:
+                            #TODO: we should differentiate between temporary and permanent redirect,
+                            #and handle correctly the second
+                            if awsresponse['Error']['Code'] in ('TemporaryRedirect', 'PermanentRedirect', 'Redirect'):
+                                redirect = awsresponse['Error']['Endpoint']
+                                if _redirectcount < 3:
+                                    _redirectcount += 1
+                                    host = redirect
+                                    continue
+                        except:
+                            pass
                     if 'Error' in awsresponse:
                         if hasattr(self, 'EXCEPTIONS') and awsresponse['Error']['Code'] in self.EXCEPTIONS:
-                            raise self.EXCEPTIONS[awsresponse['Error']['Code']](awsresponse, response.status,
-                                                                                response.reason, dict(response.headers))
+                            raise self.EXCEPTIONS[awsresponse['Error']['Code']](awsresponse,
+                                                                    {'status':response.status, 'reason':response.reason,
+                                                                     'headers':dict(response.headers)})
                         else:
-                            raise AWSException(awsresponse, response.status, response.reason, dict(response.headers))
-                    else:
-                        raise AWSDataException('unexpected status', response.status, response.reason,
-                                                dict(response.headers), data)
+                            raise AWSException(awsresponse, {'status':response.status, 'reason':response.reason,
+                                                             'headers':dict(response.headers)})
 
-                return response.status, response.reason, dict(response.headers), awsresponse
+                resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
+                              'awsresponse':awsresponse, 'type':'xmldict'}
 
-            if (response.status not in statusexpected) or ('Content-Length' not in response.headers):
-                #consume input
+                if response.status not in statusexpected:
+                    raise AWSStatusException(resultdata)
+                else:
+                    return resultdata
+
+            if response.status not in statusexpected:
+                #take a peek of the data then consume the rest of it
                 try:
                     data = response.read(1024)
                     while response.read(32768) != b'':
                         pass
                 except:
                     pass
+                resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
+                              'data':data, 'type':'error'}
+                raise AWSStatusException(resultdata)
 
-                if response.status not in statusexpected:
-                    #TODO: maybe we should retry on some status?
-                    raise AWSDataException('unexpected status', response.status, response.reason,
-                                           dict(response.headers), data)
+            if 'Content-Length' not in response.headers:
+                #every non xml response should have  'Content-Length' set
+                #take a peek of the data then consume the rest of it
+                try:
+                    data = response.read(1024)
+                    while response.read(32768) != b'':
+                        pass
+                except:
+                    pass
+                if data == b'':
+                    return {'status':response.status, 'reason':response.reason,
+                            'headers':dict(response.headers), 'type':'empty'}
 
-                if 'Content-Length' not in response.headers:
-                    raise AWSDataException('missing content length', response.status, response.reason,
-                                           dict(response.headers), data)
+                raise AWSDataException('missing content length', {'status':response.status, 'reason':response.reason,
+                                                                  'headers':dict(response.headers),'data':data,
+                                                                  'type':'error'})
 
             #if we are here then most probably we want to download some data
             size = int(response.headers['Content-Length'])
@@ -306,8 +352,8 @@ class AWSClient:
                     raise
 
                 if (data == b'') or (ammount > size):
-                    return response.status, response.reason, dict(response.headers), sizeinfo, inputobject
-
+                    return {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
+                            'sizeinfo':sizeinfo, 'type':'raw', 'inputobject':inputobject}
                 inputobject.write(data)
 
             # if we are here then we should retry

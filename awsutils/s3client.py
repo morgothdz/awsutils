@@ -339,7 +339,8 @@ class S3Client(AWSClient):
 
     #==================================== operations on the service ====================================================
     def getService(self):
-        _status, _reason, _headers, data = self.request(method='GET', uri='/', signmethod=SIGNATURE_S3_REST)
+        data = self.request(method='GET', uri='/', signmethod=SIGNATURE_S3_REST)
+        data = data['awsresponse']
         buckets = data['ListAllMyBucketsResult']['Buckets']['Bucket']
         if isinstance(buckets, dict): buckets = [buckets]
         return data['ListAllMyBucketsResult']
@@ -384,39 +385,33 @@ class S3Client(AWSClient):
         if marker is not None: query['marker'] = marker
         if maxkeys is not None: query['max-keys'] = maxkeys
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri, host=endpoint, query=query,
-                                                        signmethod=SIGNATURE_S3_REST)
-        return data['ListBucketResult']
+        data = self.request(method="GET", uri=uri, host=endpoint, query=query, signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['ListBucketResult']
 
     def getBucketAcl(self, bucketname):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri, host=endpoint, query={'acl': None},
-                                                        signmethod=SIGNATURE_S3_REST)
-        return data['AccessControlPolicy']
+        data = self.request(method="GET", uri=uri, host=endpoint, query={'acl': None}, signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['AccessControlPolicy']
 
     def getBucketCors(self, bucketname):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri, host=endpoint, query={'cors': None},
-                                                        signmethod=SIGNATURE_S3_REST)
-        return data['CORSConfiguration']
+        data = self.request(method="GET", uri=uri, host=endpoint, query={'cors': None}, signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['CORSConfiguration']
 
     def getBucketLifecycle(self, bucketname):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri, host=endpoint, query={'lifecycle': None},
-                                                        signmethod=SIGNATURE_S3_REST)
-        return data['LifecycleConfiguration']
+        data = self.request(method="GET", uri=uri, host=endpoint, query={'lifecycle': None}, signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['LifecycleConfiguration']
 
     def getBucketPolicy(self, bucketname):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri, host=endpoint, query={'policy': None},
-                                                        signmethod=SIGNATURE_S3_REST)
-        return data['LifecycleConfiguration']
+        data = self.request(method="GET", uri=uri, host=endpoint, query={'policy': None}, signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['LifecycleConfiguration']
 
     def getBucketLocation(self, bucketname):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri, host=endpoint, query={'location': None},
-                                                        signmethod=SIGNATURE_S3_REST)
-        location = data['LocationConstraint']
+        data = self.request(method="GET", uri=uri, host=endpoint, query={'location': None}, signmethod=SIGNATURE_S3_REST)
+        location = data['awsresponse']['LocationConstraint']
         if location == '':
             location = 'us-standard'
         return location
@@ -430,17 +425,17 @@ class S3Client(AWSClient):
         if prefix is not None: query['prefix'] = prefix
         if upload_id_marker is not None: query['upload-id-marker'] = upload_id_marker
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri, host=endpoint,
-                                                        query=query, signmethod=SIGNATURE_S3_REST)
-        return data['ListMultipartUploadsResult']
+        data = self.request(method="GET", uri=uri, host=endpoint, query=query, signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['ListMultipartUploadsResult']
 
     def putBucketPolicy(self, bucketname, policy):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
         if isinstance(policy, dict):
             policy = json.dumps(policy)
-        _status, _reason, _headers, data = self.request(method="PUT", uri=uri, body=policy, host=endpoint,
-                                                        statusexpected=[204], query={'policy': None},
-                                                        signmethod=SIGNATURE_S3_REST)
+        data = self.request(method="PUT", uri=uri, body=policy, host=endpoint,
+                            statusexpected=[204], query={'policy': None},
+                            signmethod=SIGNATURE_S3_REST)
+        #TODO: finish this
 
     #==================================== operations on the objects ====================================================
     def deleteObject(self, bucketname, objectname, versionID=None, x_amz_mfa=None):
@@ -452,10 +447,10 @@ class S3Client(AWSClient):
             query['vesionId'] = versionID
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, headers, _data = self.request(method="DELETE", uri=uri + objectname, host=endpoint, query=query,
-                                                        statusexpected=[204], signmethod=SIGNATURE_S3_REST)
+        data = self.request(method="DELETE", uri=uri + objectname, host=endpoint, query=query,
+                            statusexpected=[204], signmethod=SIGNATURE_S3_REST, xmlexpected=False)
 
-        headers = dict((k, v) for k, v in headers.items() if k in ('x-amz-version-id', 'x-amz-delete-marker'))
+        headers = dict((k, v) for k, v in data['headers'].items() if k in ('x-amz-version-id', 'x-amz-delete-marker'))
         return headers
 
     def deleteMultipleObjects(self, bucketname, objects, x_amz_mfa=None):
@@ -476,18 +471,12 @@ class S3Client(AWSClient):
         headers = {'Content-MD5':  base64.b64encode(md5.digest()).strip().decode()}
         if x_amz_mfa is not None:
             headers['x-amz-mfa'] = x_amz_mfa
-        status, _reason, headers, data = self.request(method="POST",
-                                                      uri=uri,
-                                                      headers=headers,
-                                                      host=endpoint,
-                                                      query={'delete':None},
-                                                      xmlexpected=True,
-                                                      body=requestbody,
-                                                      signmethod=SIGNATURE_S3_REST)
-        if data['DeleteResult'] == '':
+        data = self.request(method="POST", uri=uri, headers=headers, host=endpoint, query={'delete':None},
+                            xmlexpected=True, body=requestbody, signmethod=SIGNATURE_S3_REST)
+        if data['awsresponse']['DeleteResult'] == '':
             return True
         else:
-            return data['DeleteResult']['Error']
+            return data['awsresponse']['DeleteResult']['Error']
 
 
     def getObject(self, bucketname, objectname,
@@ -532,27 +521,23 @@ class S3Client(AWSClient):
             statusexpected.append(304)
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        status, _reason, headers, brange, data = self.request(method="HEAD" if _doHeadRequest else "GET",
-                                                              uri=uri + objectname,
-                                                              headers=headers,
-                                                              host=endpoint,
-                                                              statusexpected=statusexpected,
-                                                              query=query,
-                                                              inputobject=inputobject,
-                                                              xmlexpected=False,
-                                                              _inputIOWrapper=_inputIOWrapper,
-                                                              signmethod=SIGNATURE_S3_REST)
+        data = self.request(method="HEAD" if _doHeadRequest else "GET", uri=uri + objectname,
+                            headers=headers, host=endpoint, statusexpected=statusexpected,
+                            query=query, inputobject=inputobject, xmlexpected=False,
+                            _inputIOWrapper=_inputIOWrapper, signmethod=SIGNATURE_S3_REST)
 
-        result = dict((k, v) for k, v in headers.items() if k in ('ETag',
-                                                                  'x-amz-delete-marker', 'x-amz-expiration',
-                                                                  'x-amz-server-side-encryption',
-                                                                  'x-amz-restore', 'x-amz-version-id',
-                                                                  'x-amz-website-redirect-location')
-        or k.startswith('x-amz-meta-'))
-        result['status'] = status
-        result['range'] = brange
-        if status in (200, 206) and not _doHeadRequest:
-            result['data'] = data
+        headers = data['headers']
+
+        result = dict((k, v) for k, v in data['headers'].items() if k in ('ETag',
+                                                                          'x-amz-delete-marker', 'x-amz-expiration',
+                                                                          'x-amz-server-side-encryption',
+                                                                          'x-amz-restore', 'x-amz-version-id',
+                                                                          'x-amz-website-redirect-location')
+                                                                        or k.startswith('x-amz-meta-'))
+        result['status'] = data['status']
+        if data['status'] in (200, 206) and not _doHeadRequest:
+            result['range'] = data['sizeinfo']
+            result['data'] = data['inputobject']
         return result
 
     def headObject(self, bucketname, objectname, versionID=None, byterange=None, if_modified_since=None,
@@ -594,9 +579,9 @@ class S3Client(AWSClient):
             headers['Content-MD5'] = base64.b64encode(md5digest).strip().decode()
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, headers, _data = self.request(method="PUT", uri=uri + objectname, body=value,
-                                                        headers=headers,
-                                                        host=endpoint, signmethod=SIGNATURE_S3_REST)
+        data = self.request(method="PUT", uri=uri + objectname, body=value, headers=headers,
+                            host=endpoint, signmethod=SIGNATURE_S3_REST, xmlexpected=False)
+        headers = data['headers']
         if md5digest is not None:
             if headers['ETag'][1:-1] != binascii.hexlify(md5digest).decode():
                 raise IntegrityCheckException('putObject returned unexpected ETag value',
@@ -641,10 +626,9 @@ class S3Client(AWSClient):
 
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="PUT", uri=uri + objectname,
-                                                        headers=headers,
-                                                        host=endpoint, signmethod=SIGNATURE_S3_REST)
-        return data['CopyObjectResult']
+        data = self.request(method="PUT", uri=uri + objectname, headers=headers,
+                            host=endpoint, signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['CopyObjectResult']
 
     def putObjectAcl(self, bucketname, objectname,
                      x_amz_acl=None,
@@ -655,10 +639,8 @@ class S3Client(AWSClient):
 
     def getObjectAcl(self, bucketname, objectname):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri,
-                                                        host=endpoint, query={'acl': None},
-                                                        signmethod=SIGNATURE_S3_REST)
-        return data['AccessControlPolicy']
+        data = self.request(method="GET", uri=uri, host=endpoint, query={'acl': None}, signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['AccessControlPolicy']
 
 
     def uploadOjectPart(self, bucketname, objectname, partnumber, uploadid, value, objlen=None, md5digest=None):
@@ -670,11 +652,9 @@ class S3Client(AWSClient):
             headers['Content-MD5'] = base64.b64encode(md5digest).strip().decode()
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, headers, _data = self.request(method="PUT", uri=uri + objectname, body=value,
-                                                        headers=headers,
-                                                        host=endpoint,
-                                                        query={"partNumber": partnumber, "uploadId": uploadid},
-                                                        signmethod=SIGNATURE_S3_REST)
+        data = self.request(method="PUT", uri=uri + objectname, body=value, headers=headers, host=endpoint,
+                            query={"partNumber": partnumber, "uploadId": uploadid},signmethod=SIGNATURE_S3_REST)
+        headers = data['headers']
         if md5digest is not None:
             if headers['ETag'][1:-1] != binascii.hexlify(md5digest).decode():
                 raise IntegrityCheckException('uploadOjectPart returned unexpected ETag value', headers['ETag'][1:-1],
@@ -713,10 +693,9 @@ class S3Client(AWSClient):
             headers['x-amz-website-redirect-location'] = x_amz_website_redirect_location
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="POST", uri=uri + objectname,
-                                                        headers=headers, host=endpoint,
-                                                        query={"uploads": None}, signmethod=SIGNATURE_S3_REST)
-        data = data['InitiateMultipartUploadResult']
+        data = self.request(method="POST", uri=uri + objectname, headers=headers, host=endpoint,
+                            query={"uploads": None}, signmethod=SIGNATURE_S3_REST)
+        data = data['awsresponse']['InitiateMultipartUploadResult']
         if data['Bucket'] != bucketname or data['Key'] != objectname:
             raise IntegrityCheckException('unexpected bucket/key name received', (data['Bucket'],data['Key']),
                                           (bucketname, objectname))
@@ -729,11 +708,9 @@ class S3Client(AWSClient):
         data.append("</CompleteMultipartUpload>")
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="POST", uri=uri + objectname,
-                                                        body="".join(data),
-                                                        host=endpoint, query={"uploadId": uploadId},
-                                                        signmethod=SIGNATURE_S3_REST)
-        data = data['CompleteMultipartUploadResult']
+        data = self.request(method="POST", uri=uri + objectname, body="".join(data), host=endpoint,
+                            query={"uploadId": uploadId}, signmethod=SIGNATURE_S3_REST)
+        data = data['awsresponse']['CompleteMultipartUploadResult']
         if data['Bucket'] != bucketname or data['Key'] != objectname:
             raise IntegrityCheckException('unexpected bucket/key name received', (data['Bucket'],data['Key']),
                                           (bucketname, objectname))
@@ -751,9 +728,8 @@ class S3Client(AWSClient):
         if part_number_marker is not None:
             query['part-number-marker'] = part_number_marker
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        _status, _reason, _headers, data = self.request(method="GET", uri=uri + objectname,
-                                                        host=endpoint, query=query, signmethod=SIGNATURE_S3_REST)
-        data = data['ListPartsResult']
+        data = self.request(method="GET", uri=uri + objectname, host=endpoint, query=query, signmethod=SIGNATURE_S3_REST)
+        data = data['awsresponse']['ListPartsResult']
         if data['Bucket'] != bucketname or data['Key'] != objectname:
             raise IntegrityCheckException('unexpected bucket/key name received', (data['Bucket'],data['Key']),
                                           (bucketname, objectname))
