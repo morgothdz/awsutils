@@ -4,7 +4,7 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-import os, hashlib
+import os, hashlib, logging
 from awsutils.s3.object import S3Object
 from awsutils.utils.wrappers import SimpleWindowedFileObjectReadWrapper, SimpleMd5FileObjectWriteWrapper
 from awsutils.client import AWSPartialReception, IntegrityCheckException, UserInputException
@@ -23,6 +23,8 @@ class S3Bucket():
         self.s3client = s3client
         self.owner = owner
         self.creationdate = creationdate
+        self.logger = logging.getLogger("%s.%s" % (type(self).__module__, type(self).__name__))
+        self.logger.addHandler(logging.NullHandler())
 
     def getObject(self, name):
         data = self.s3client.getBucket(bucketname=self.name, prefix=name, maxkeys=1)
