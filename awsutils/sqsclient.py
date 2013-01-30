@@ -62,6 +62,15 @@ class SQSClient(AWSClient):
                             uri="/%s/%s" % (accNumber, qName))
         data['awsresponse']['AddPermissionResponse']
 
+    def removePermission(self, label, endpoint=None, accNumber=None):
+        if endpoint is None: endpoint = self.endpoint
+        if accNumber is None: accNumber = self.accNumber
+        query ={'Action':'RemovePermission', 'Label':label, 'Version':'2012-11-05'}
+        data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,
+                            region=endpoint[4:-14], service='sqs', host=endpoint,
+                            uri="/%s/%s" % (accNumber, qName))
+        data['awsresponse']['RemovePermissionResponse']
+
     def changeMessageVisibility(self, qName, receiptHandle, visibilityTimeout, accNumber=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
         if accNumber is None: accNumber = self.accNumber
@@ -152,6 +161,10 @@ class SQSClient(AWSClient):
                              service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
         data['awsresponse']['DeleteQueueResponse']
 
+    def setQueueAttributes(self):
+        #TODO:
+        pass
+
     def getQueueAttributes(self, qName, attributes = ['All'], accNumber=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
         if accNumber is None: accNumber = self.accNumber
@@ -174,6 +187,7 @@ class SQSClient(AWSClient):
                              service='sqs', host=endpoint)
         result = []
         data = data['awsresponse']['ListQueuesResponse']['ListQueuesResult']
+        urls = []
         if 'QueueUrl' in data:
             urls = data['QueueUrl']
             if not isinstance(urls, list):
