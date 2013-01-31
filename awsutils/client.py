@@ -21,10 +21,11 @@ import awsutils.utils.auth as authutils
 
 class AWSException(Exception):
     """exceptions raised on amazon error responses"""
-    def __init__(self, errorResponse, data):
+    def __init__(self, errorResponse, data, extra=None):
         Exception.__init__(self, errorResponse)
         self.errorResponse = errorResponse
         self.data = data
+        self.extra = extra
     def __str__(self):
         return "%s-%s: %s"%(self.data['status'], self.errorResponse['Error']['Code'],
                              self.errorResponse['Error']['Message'])
@@ -198,6 +199,7 @@ class AWSClient:
             if xmlexpected or ('Content-Type' in response.headers and
                                response.headers['Content-Type'] in ('application/xml', 'text/xml')):
 
+                """
                 if xmlexpected and not('Content-Type' in response.headers and
                                        response.headers['Content-Type'] in ('application/xml', 'text/xml')):
                     try:
@@ -209,6 +211,7 @@ class AWSClient:
                     resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
                                   'data':data, 'type':'error'}
                     raise AWSDataException('xml expected', resultdata)
+                """
 
 
                 if ('Content-Length' not in response.headers) and ('Transfer-Encoding' not in response.headers or
@@ -264,14 +267,39 @@ class AWSClient:
                                     continue
                         except:
                             pass
+
                     if 'Error' in awsresponse:
-                        if hasattr(self, 'EXCEPTIONS') and awsresponse['Error']['Code'] in self.EXCEPTIONS:
-                            raise self.EXCEPTIONS[awsresponse['Error']['Code']](awsresponse,
+                        #this implementation works wirh s3
+                        if hasattr(self, 'EXCEPTIONS') and awsresponse['Error']['Code'].replace('.','_') in self.EXCEPTIONS:
+                            raise self.EXCEPTIONS[awsresponse['Error']['Code'].replace('.','_')](awsresponse,
                                                                     {'status':response.status, 'reason':response.reason,
                                                                      'headers':dict(response.headers)})
                         else:
                             raise AWSException(awsresponse, {'status':response.status, 'reason':response.reason,
                                                              'headers':dict(response.headers)})
+                    elif 'ErrorResponse' in awsresponse and 'Error' in awsresponse['ErrorResponse']:
+                    #this implementation works wirh sqs
+                        error = awsresponse['ErrorResponse']
+                        if hasattr(self, 'EXCEPTIONS') and error['Error']['Code'].replace('.','_') in self.EXCEPTIONS:
+                            raise self.EXCEPTIONS[error['Error']['Code'].replace('.','_')](error,
+                                {'status':response.status, 'reason':response.reason,
+                                 'headers':dict(response.headers)}, awsresponse)
+                        else:
+                            raise AWSException(error, {'status':response.status, 'reason':response.reason,
+                                                       'headers':dict(response.headers)}, awsresponse)
+
+                    elif 'Response' in awsresponse and 'Errors' in awsresponse['Response']:
+                        #this implementation works with sdb
+                        errors = awsresponse['Response']['Errors']['Error']
+                        if isinstance(errors, dict): errors = [errors]
+                        for error in errors:
+                            if hasattr(self, 'EXCEPTIONS') and error['Code'].replace('.','_') in self.EXCEPTIONS:
+                                raise self.EXCEPTIONS[error['Code'].replace('.','_')]({'Error':error},
+                                    {'status':response.status, 'reason':response.reason,
+                                     'headers':dict(response.headers)}, awsresponse)
+                        else:
+                            raise AWSException({'Error':errors[0]}, {'status':response.status, 'reason':response.reason,
+                                                            'headers':dict(response.headers)}, awsresponse)
 
                 resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
                               'awsresponse':awsresponse, 'type':'xmldict'}
