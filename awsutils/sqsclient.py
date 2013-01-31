@@ -18,6 +18,10 @@ class AWSSQSException_AuthFailure(AWSException):
     #A value used for authentication could not be validated, such as Signature
     HTTP_STATUS = 403
 
+class AWSSQSException_AWS_SimpleQueueService_NonExistentQueue(AWSException):
+    #The specified queue does not exist for this wsdl version
+    HTTP_STATUS = 400
+
 SQS_PERMISSIONS = {'*', 'SendMessage', 'ReceiveMessage', 'DeleteMessage', 'ChangeMessageVisibility',
                    'GetQueueAttributes', 'GetQueueUrl'}
 

@@ -1,3 +1,9 @@
+# test/test_sdb.py
+# Copyright 2013 Sandor Attila Gerendi (Sanyi)
+#
+# This module is part of awsutils and is released under
+# the MIT License: http://www.opensource.org/licenses/mit-license.php
+
 import time
 from unittest import TestCase
 from awsutils.sqsclient import SQSClient
@@ -18,6 +24,7 @@ class SQSClientMethodTesting(TestCase):
                 print('deleting', queue)
                 self.sqs.deleteQueue(queue['qName'])
             except Exception as e:
+                #deleted queues will survive for a time if listQueues but deleteQueue once more on them will fail
                 print("Failed to clean up queue", queue, e)
         self.sqs = None
 
