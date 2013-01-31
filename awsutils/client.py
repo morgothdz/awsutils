@@ -276,12 +276,12 @@ class AWSClient:
                 resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
                               'awsresponse':awsresponse, 'type':'xmldict'}
 
-                if response.status not in statusexpected:
+                if statusexpected is not True and response.status not in statusexpected:
                     raise AWSStatusException(resultdata)
                 else:
                     return resultdata
 
-            if response.status not in statusexpected:
+            if statusexpected is not True and response.status not in statusexpected:
                 #take a peek of the data then consume the rest of it
                 try:
                     data = response.read(1024)
