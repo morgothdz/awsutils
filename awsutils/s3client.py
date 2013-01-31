@@ -479,13 +479,8 @@ class S3Client(AWSClient):
             return data['awsresponse']['DeleteResult']['Error']
 
 
-    def getObject(self, bucketname, objectname,
-                  inputobject=None,
-                  byterange=None,
-                  versionID=None,
-                  if_modified_since=None,
-                  if_unmodified_since=None, if_match=None, if_none_match=None,
-                  _doHeadRequest=False,
+    def getObject(self, bucketname, objectname, inputobject=None, byterange=None, versionID=None,
+                  if_modified_since=None, if_unmodified_since=None, if_match=None, if_none_match=None,
                   _inputIOWrapper=None):
         """
         range = list(start, end)
@@ -521,7 +516,7 @@ class S3Client(AWSClient):
             statusexpected.append(304)
 
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
-        data = self.request(method="HEAD" if _doHeadRequest else "GET", uri=uri + objectname,
+        data = self.request(method="GET", uri=uri + objectname,
                             headers=headers, host=endpoint, statusexpected=statusexpected,
                             query=query, inputobject=inputobject, xmlexpected=False,
                             _inputIOWrapper=_inputIOWrapper, signmethod=SIGNATURE_S3_REST)
@@ -535,15 +530,61 @@ class S3Client(AWSClient):
                                                                           'x-amz-website-redirect-location')
                                                                         or k.startswith('x-amz-meta-'))
         result['status'] = data['status']
-        if data['status'] in (200, 206) and not _doHeadRequest:
+        if data['status'] in (200, 206):
             result['range'] = data['sizeinfo']
             result['data'] = data['inputobject']
         return result
 
     def headObject(self, bucketname, objectname, versionID=None, byterange=None, if_modified_since=None,
-                   if_unmodified_since=None, if_match=None, if_none_match=None, inputbuffer=None):
-        return self.getObject(bucketname, objectname, versionID, byterange, if_modified_since, if_unmodified_since,
-                              if_match, if_none_match, inputbuffer, _doHeadRequest=True)
+                   if_unmodified_since=None, if_match=None, if_none_match=None):
+        """
+       range = list(start, end)
+       inputbuffer = be any object implementing write(bytes)
+       if no inputbuffer is provided then the response will be depending on the response size an io.BytesIO or a
+       tempfile.TemporaryFile opened to mode w+b
+       """
+        query = {}
+        if versionID is not None:
+            query['vesionId'] = versionID
+        headers = {}
+        statusexpected = [404, 200]
+        if byterange is not None:
+            if len(byterange) > 1:
+                headers['Range'] = "bytes=%d-%d" % (byterange[0], byterange[1])
+            else:
+                headers['Range'] = "bytes=%d-" % (byterange[0],)
+            statusexpected = [200, 206]
+
+        if if_modified_since is not None:
+            # TODO: implement
+            headers['If-Modified-Since'] = None
+            statusexpected.append(304)
+        if if_unmodified_since is not None:
+            # TODO: implement
+            headers['If-Unmodified-Since'] = None
+            statusexpected.append(412)
+        if if_match is not None:
+            headers['If-Match'] = '"' + if_match + '"'
+            statusexpected.append(412)
+        if if_none_match is not None:
+            headers['If-None-Match'] = '"' + if_none_match + '"'
+            statusexpected.append(304)
+
+        uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        data = self.request(method="HEAD", uri=uri + objectname,
+                            headers=headers, host=endpoint, statusexpected=statusexpected,
+                            query=query, xmlexpected=False, signmethod=SIGNATURE_S3_REST)
+
+        headers = data['headers']
+
+        result = dict((k, v) for k, v in data['headers'].items() if k in ('ETag',
+                                                                          'x-amz-delete-marker', 'x-amz-expiration',
+                                                                          'x-amz-server-side-encryption',
+                                                                          'x-amz-restore', 'x-amz-version-id',
+                                                                          'x-amz-website-redirect-location')
+        or k.startswith('x-amz-meta-'))
+        result['status'] = data['status']
+        return result
 
     def putObject(self, bucketname, objectname, value, objlen=None, md5digest=None,
                   meta=None,
