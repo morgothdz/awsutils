@@ -171,7 +171,7 @@ class SQSClient(AWSClient):
         query ={'Action':'GetQueueAttributes', 'Version': '2012-11-05'}
         i = 1
         for attribute in attributes:
-            if attribyte not in SQS_QUEUE_ATTRIBUTES:
+            if attribute not in SQS_QUEUE_ATTRIBUTES:
                 raise UserInputException('unknown attribute')
             query['AttributeName.%d'%(i,)] = attribute
             i += 1
