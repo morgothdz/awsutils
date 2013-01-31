@@ -28,6 +28,9 @@ class SimpleMd5FileObjectWriteWrapper:
         return self.md5.digest()
     def getMd5HexDigest(self):
         return self.md5.hexdigest()
+    def __iter__(self):
+        #workaround for issue http://bugs.python.org/issue16904
+        return iter(b'')
 
 
 class SimpleWindowedFileObjectReadWrapper:
@@ -104,3 +107,7 @@ class SimpleWindowedFileObjectReadWrapper:
     def getMd5HexDigest(self):
         if self.hashcheck:
             return self.md5.hexdigest()
+
+    def __iter__(self):
+        #workaround for issue http://bugs.python.org/issue16904
+        return iter(b'')
