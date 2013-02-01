@@ -7,7 +7,7 @@
 import os, hashlib, logging
 from awsutils.s3.object import S3Object
 from awsutils.utils.wrappers import SimpleWindowedFileObjectReadWrapper, SimpleMd5FileObjectWriteWrapper
-from awsutils.client import AWSPartialReception, IntegrityCheckException, UserInputException
+from awsutils.exceptions.aws import AWSPartialReception, IntegrityCheckException, UserInputException
 
 class S3Bucket():
     def __init__(self, name, s3client,

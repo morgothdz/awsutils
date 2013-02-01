@@ -4,8 +4,8 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-from awsutils.client import AWSClient
-from awsutils.utils.auth import SIGNATURE_V2, SIGNATURE_V4
+from awsutils.awsclient import AWSClient
+from awsutils.utils.auth import SIGNATURE_V2
 
 class IAMClient(AWSClient):
     def __init__(self, access_key, secret_key):

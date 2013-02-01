@@ -10,7 +10,8 @@ import time
 import unittest
 from unittest import TestCase
 from test.settings import access_key, secret_key
-from awsutils.sdbclient import SimpleDBClient, AWSSDBException_NoSuchDomain
+from awsutils.sdbclient import SimpleDBClient
+from awsutils.exceptions.sdb import NoSuchDomain
 
 class SDBClientMethodTesting(TestCase):
     def setUp(self):
@@ -43,7 +44,7 @@ class SDBClientMethodTesting(TestCase):
 
         self.sdb.deleteDomain(newdomainename)
 
-        with self.assertRaises(AWSSDBException_NoSuchDomain):
+        with self.assertRaises(NoSuchDomain):
             self.sdb.domainMetadata(newdomainename)
 
 if __name__ == '__main__':

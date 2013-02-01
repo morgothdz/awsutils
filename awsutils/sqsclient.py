@@ -5,22 +5,11 @@
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 import hashlib
-from awsutils.client import AWSClient, UserInputException, IntegrityCheckException, AWSException
+import awsutils.exceptions.sqs
+from awsutils.exceptions.aws import UserInputException, IntegrityCheckException, extractExceptionsFromModule2Dicitonary
+from awsutils.awsclient import AWSClient
 from awsutils.iamclient import IAMClient
 from awsutils.utils.auth import SIGNATURE_V4_HEADERS
-from awsutils.utils.exceptions import generateExceptionDictionary
-
-class AWSSQSException_AccessDenied(AWSException):
-    #Access to the resource is denied
-    HTTP_STATUS = 403
-
-class AWSSQSException_AuthFailure(AWSException):
-    #A value used for authentication could not be validated, such as Signature
-    HTTP_STATUS = 403
-
-class AWSSQSException_AWS_SimpleQueueService_NonExistentQueue(AWSException):
-    #The specified queue does not exist for this wsdl version
-    HTTP_STATUS = 400
 
 SQS_PERMISSIONS = {'*', 'SendMessage', 'ReceiveMessage', 'DeleteMessage', 'ChangeMessageVisibility',
                    'GetQueueAttributes', 'GetQueueUrl'}
@@ -31,8 +20,6 @@ SQS_QUEUE_ATTRIBUTES = {'All', 'ApproximateNumberOfMessages', 'ApproximateNumber
                         'QueueArn', 'ReceiveMessageWaitTimeSeconds', 'DelaySeconds'}
 
 class SQSClient(AWSClient):
-
-    EXCEPTIONS = generateExceptionDictionary(__name__, exceptionprefix = 'AWSSQSException_')
 
     def __init__(self, endpoint, access_key, secret_key, accNumber=None, secure=False):
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
@@ -66,7 +53,7 @@ class SQSClient(AWSClient):
                             uri="/%s/%s" % (accNumber, qName))
         data['awsresponse']['AddPermissionResponse']
 
-    def removePermission(self, label, endpoint=None, accNumber=None):
+    def removePermission(self, qName, label, endpoint=None, accNumber=None):
         if endpoint is None: endpoint = self.endpoint
         if accNumber is None: accNumber = self.accNumber
         query ={'Action':'RemovePermission', 'Label':label, 'Version':'2012-11-05'}
@@ -169,16 +156,19 @@ class SQSClient(AWSClient):
         #TODO:
         pass
 
-    def getQueueAttributes(self, qName, attributes = ['All'], accNumber=None, endpoint=None):
+    def getQueueAttributes(self, qName, attributes = 'All', accNumber=None, endpoint=None):
         if endpoint is None: endpoint = self.endpoint
         if accNumber is None: accNumber = self.accNumber
         query ={'Action':'GetQueueAttributes', 'Version': '2012-11-05'}
         i = 1
-        for attribute in attributes:
-            if attribute not in SQS_QUEUE_ATTRIBUTES:
-                raise UserInputException('unknown attribute')
-            query['AttributeName.%d'%(i,)] = attribute
-            i += 1
+        if isinstance(attributes, str):
+            query['AttributeName.1'] = attributes
+        else:
+            for attribute in attributes:
+                if attribute not in SQS_QUEUE_ATTRIBUTES:
+                    raise UserInputException('unknown attribute')
+                query['AttributeName.%d'%(i,)] = attribute
+                i += 1
         data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query,region=endpoint[4:-14],
                              service='sqs', host=endpoint, uri="/%s/%s" % (accNumber, qName))
         return data['awsresponse']['GetQueueAttributesResponse']['GetQueueAttributesResult']['Attribute']
@@ -303,3 +293,14 @@ class SQSClient(AWSClient):
             if md5message != md5calculated:
                 raise IntegrityCheckException("sendMessage unexpected MD5OfMessageBody received",
                                               md5message, md5calculated)
+
+    #================================== helper functionality ===========================================================
+    EXCEPTIONS = extractExceptionsFromModule2Dicitonary('awsutils.exceptions.sqs',
+                                                         awsutils.exceptions.sqs.SQSException)
+    def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
+        if 'ErrorResponse' in awsresponse and 'Error' in awsresponse['ErrorResponse']:
+            error = awsresponse['ErrorResponse']['Error']
+            if error['Code'].replace('.','_') in self.EXCEPTIONS:
+                raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus, httpreason, httpheaders)
+            else:
+                raise awsutils.exceptions.sqs.SQSException(awsresponse, httpstatus, httpreason, httpheaders)

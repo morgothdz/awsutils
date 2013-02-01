@@ -19,61 +19,6 @@ except ImportError:  # Doesn't exist on OSX and other platforms
 from awsutils.utils.xmlhandler import AWSXMLHandler
 import awsutils.utils.auth as authutils
 
-class AWSException(Exception):
-    """exceptions raised on amazon error responses"""
-    def __init__(self, errorResponse, data, extra=None):
-        Exception.__init__(self, errorResponse)
-        self.errorResponse = errorResponse
-        self.data = data
-        self.extra = extra
-    def __str__(self):
-        return "%s-%s: %s"%(self.data['status'], self.errorResponse['Error']['Code'],
-                             self.errorResponse['Error']['Message'])
-
-class UserInputException(Exception):
-    pass
-
-class IntegrityCheckException(Exception):
-    def __init__(self, message, received = None, expected = None):
-        Exception.__init__(self, message)
-        self.received = received
-        self.expected = expected
-
-class AWSStatusException(Exception):
-    def __init__(self, data):
-        Exception.__init__(self)
-        self.data = data
-    def __str__(self):
-        return repr(self.__dict__)
-
-class AWSDataException(Exception):
-    def __init__(self, message, data):
-        Exception.__init__(self, message)
-        self.message = message
-        self.data = data
-    def __str__(self):
-        return repr(self.__dict__)
-
-class AWSTimeout(Exception):
-    pass
-
-
-class AWSPartialReception(Exception):
-    """exceptions raised when there is partial data received from amazon,
-    but the request itself failed at some point"""
-
-    def __init__(self, status, reason, headers, data, sizeinfo, exception):
-        self.status = status
-        self.reason = reason
-        self.headers = headers
-        self.data = data
-        self.sizeinfo = sizeinfo
-        self.exception = exception
-
-    def __repr__(self):
-        return "AWSPartialReception [%d]" % (self.sizeinfo,)
-
-
 class AWSClient:
     MAX_IN_MEMORY_READ_CHUNK_SIZE_FOR_RAW_DATA = 1024 * 1024
     HTTP_CONNECTION_RETRY_NUMBER = 3
@@ -88,6 +33,12 @@ class AWSClient:
         self.connections = {}
         self.logger = logging.getLogger("%s.%s" % (type(self).__module__, type(self).__name__))
         self.logger.addHandler(logging.NullHandler())
+
+    def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
+        """
+        Checks for aws error responses, this should be overriden by each subclass
+        """
+        pass
 
     def closeConnections(self):
         for connection in self.connections.values():
@@ -199,24 +150,9 @@ class AWSClient:
             if xmlexpected or ('Content-Type' in response.headers and
                                response.headers['Content-Type'] in ('application/xml', 'text/xml')):
 
-                """
-                if xmlexpected and not('Content-Type' in response.headers and
-                                       response.headers['Content-Type'] in ('application/xml', 'text/xml')):
-                    try:
-                        data = response.read(1024)
-                        while response.read(32768) != b'':
-                            pass
-                    except:
-                        pass
-                    resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
-                                  'data':data, 'type':'error'}
-                    raise AWSDataException('xml expected', resultdata)
-                """
-
-
                 if ('Content-Length' not in response.headers) and ('Transfer-Encoding' not in response.headers or
                                                                    response.headers['Transfer-Encoding'] != 'chunked'):
-                #every non xml response should have  'Content-Length' set or be chunked
+                #every xml response should have 'Content-Length' set or 'Transfer-Encoding' = chunked
                 #take a peek of the data then consume the rest of it
                     try:
                         data = response.read(1024)
@@ -268,38 +204,11 @@ class AWSClient:
                         except:
                             pass
 
-                    if 'Error' in awsresponse:
-                        #this implementation works wirh s3
-                        if hasattr(self, 'EXCEPTIONS') and awsresponse['Error']['Code'].replace('.','_') in self.EXCEPTIONS:
-                            raise self.EXCEPTIONS[awsresponse['Error']['Code'].replace('.','_')](awsresponse,
-                                                                    {'status':response.status, 'reason':response.reason,
-                                                                     'headers':dict(response.headers)})
-                        else:
-                            raise AWSException(awsresponse, {'status':response.status, 'reason':response.reason,
-                                                             'headers':dict(response.headers)})
-                    elif 'ErrorResponse' in awsresponse and 'Error' in awsresponse['ErrorResponse']:
-                    #this implementation works wirh sqs
-                        error = awsresponse['ErrorResponse']
-                        if hasattr(self, 'EXCEPTIONS') and error['Error']['Code'].replace('.','_') in self.EXCEPTIONS:
-                            raise self.EXCEPTIONS[error['Error']['Code'].replace('.','_')](error,
-                                {'status':response.status, 'reason':response.reason,
-                                 'headers':dict(response.headers)}, awsresponse)
-                        else:
-                            raise AWSException(error, {'status':response.status, 'reason':response.reason,
-                                                       'headers':dict(response.headers)}, awsresponse)
-
-                    elif 'Response' in awsresponse and 'Errors' in awsresponse['Response']:
-                        #this implementation works with sdb
-                        errors = awsresponse['Response']['Errors']['Error']
-                        if isinstance(errors, dict): errors = [errors]
-                        for error in errors:
-                            if hasattr(self, 'EXCEPTIONS') and error['Code'].replace('.','_') in self.EXCEPTIONS:
-                                raise self.EXCEPTIONS[error['Code'].replace('.','_')]({'Error':error},
-                                    {'status':response.status, 'reason':response.reason,
-                                     'headers':dict(response.headers)}, awsresponse)
-                        else:
-                            raise AWSException({'Error':errors[0]}, {'status':response.status, 'reason':response.reason,
-                                                            'headers':dict(response.headers)}, awsresponse)
+                    if self.checkForErrors(awsresponse, response.status, response.reason, response.headers) is True:
+                        if _retrycount < retry:
+                            _retrycount += 1
+                            doretry = True
+                            break
 
                 resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
                               'awsresponse':awsresponse, 'type':'xmldict'}

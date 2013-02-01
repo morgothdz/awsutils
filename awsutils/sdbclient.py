@@ -5,34 +5,12 @@
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
 import collections
-from awsutils.client import AWSClient, UserInputException, AWSException
+from awsutils.exceptions.aws import UserInputException, extractExceptionsFromModule2Dicitonary
+from awsutils.awsclient import AWSClient
 from awsutils.utils.auth import SIGNATURE_V2
-from awsutils.utils.exceptions import generateExceptionDictionary
-
-class AWSSDBException_AccessFailure(AWSException):
-    #Access to the resource  is denied
-    HTTP_STATUS = 403
-
-class AWSSDBException_AttributeDoesNotExist(AWSException):
-    #Attribute does not exist
-    HTTP_STATUS = 404
-
-class AWSSDBException_AuthFailure(AWSException):
-    #AWS was not able to validate the provided access credentials.
-    HTTP_STATUS = 403
-
-class AWSSDBException_AuthMissingFailure(AWSException):
-    #AWS was not able to validate the provided access credentials.
-    HTTP_STATUS = 403
-
-#
-class AWSSDBException_NoSuchDomain(AWSException):
-    #The specified domain does not exist.
-    HTTP_STATUS = 400
+import awsutils.exceptions.sdb
 
 class SimpleDBClient(AWSClient):
-
-    EXCEPTIONS = generateExceptionDictionary(__name__, exceptionprefix = 'AWSSDBException_')
 
     def __init__(self, endpoint, access_key, secret_key, secure=False):
         self.boxUssage = 0
@@ -318,3 +296,20 @@ class SimpleDBClient(AWSClient):
         data = data['awsresponse']
         boxUsage = float(data['DeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
         self.boxUssage += boxUsage
+
+    #================================== helper functionality ===========================================================
+
+    EXCEPTIONS = extractExceptionsFromModule2Dicitonary('awsutils.exceptions.sdb',
+                                                         awsutils.exceptions.sdb.SDBException)
+
+    def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
+        if 'Response' in awsresponse and 'Errors' in awsresponse['Response']:
+            #raise the first error we found
+            errors = awsresponse['Response']['Errors']['Error']
+            if isinstance(errors, dict): errors = [errors]
+            for error in errors:
+                if error['Code'].replace('.','_') in self.EXCEPTIONS:
+                    raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus,
+                                                                          httpreason, httpheaders)
+            else:
+                raise awsutils.exceptions.sdb.SDBException(awsresponse, httpstatus, httpreason, httpheaders)
