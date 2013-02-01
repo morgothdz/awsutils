@@ -21,6 +21,14 @@ class SQSQueue:
         self.qName = qName
         self.sqsservice = sqsservice
 
+    def refresh(self):
+        """
+        Refresh the queue attributes
+        """
+        attributes = self.sqsservice.sqsclient.getQueueAttributes(self.qName)
+        for attribute in attributes:
+            setattr(self, attribute['Name'], attribute['Value'])
+
     def send(self, message, delaySeconds=None):
         """
         @type message: SQSMessage
@@ -33,10 +41,10 @@ class SQSQueue:
     def delete(self, message):
         if message.receiptHandle is None:
             raise UserInputException('this message does not have receiptHandle set')
-        if message.qName != self.qName:
+        if message.queue != self:
             raise UserInputException('this message does not belong to this queue')
-        self.sqsservice.sqsclient.deleteMessage(message.qName, message.receiptHandle)
-        message.qName = None
+        self.sqsservice.sqsclient.deleteMessage(message.queue.qName, message.receiptHandle)
+        message.queue = None
         message.receiptHandle = None
 
     def receive(self, attributes='All', maxNumberOfMessages=1, visibilityTimeout=None, waitTimeSeconds=None):
@@ -62,11 +70,15 @@ class SQSQueue:
                 time.sleep(self.COOLDOWN_BETWEEN_RECEIVEMESSAGES)
 
         result = []
+        if visibilityTimeout == None:
+            visibilityTimeout = int(self.VisibilityTimeout)
         for item in messages:
             message = SQSMessage(item['Body'])
             message.id = item['MessageId']
             message.receiptHandle = item['ReceiptHandle']
-            message.qName = self.qName
+            message.queue = self
+            message.visibilityTimeout = visibilityTimeout
+            message.receptionTimestamp = time.time()
             for attribute in item['Attribute']:
                 setattr(message, attribute['Name'], attribute['Value'])
             if maxNumberOfMessages == 0:
