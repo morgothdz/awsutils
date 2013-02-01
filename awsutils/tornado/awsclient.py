@@ -1,4 +1,4 @@
-import os, json, hashlib, time, functools, xml.sax
+import time, functools, xml
 import tornado.ioloop
 import tornado.web
 import tornado.httpserver
@@ -9,8 +9,8 @@ from awsutils.utils.xmlhandler import AWSXMLHandler
 import awsutils.utils.auth as auth
 
 class AWSClient:
-    def __init__(self, host, access_key, secret_key, secure=False, _ioloop=tornado.ioloop.IOLoop.instance()):
-        self.host = host
+    def __init__(self, endpoint, access_key, secret_key, secure=False, _ioloop=tornado.ioloop.IOLoop.instance()):
+        self.endpoint = endpoint
         self.access_key = access_key
         self.secret_key = secret_key
         self.secure = secure
@@ -19,12 +19,12 @@ class AWSClient:
 
     def streamingCallback(self, incrementalParser, collector, data):
         collector.append(data)
-        if hasattr(incrementalParser.handler, 'exception'):
+        if hasattr(incrementalParser._cont_handler, 'exception'):
             return
         try:
             incrementalParser.feed(data)
         except Exception as e:
-            incrementalParser.handler.exception = e
+            incrementalParser._cont_handler.exception = e
 
     def checkForErrors(self, awsresponse, httpstatus):
         pass
@@ -34,6 +34,7 @@ class AWSClient:
                 body=None, signmethod=None, region=None, service=None, date=time.gmtime(), xmlexpected=True,
                 connect_timeout=2, request_timeout=5):
 
+        if endpoint is None: endpoint = self.endpoint
         if statusexpected is None: statusexpected = [200]
         headers, query, body = auth.signRequest(access_key=self.access_key, secret_key=self.secret_key,
                                                 endpoint=endpoint, region=region, service=service,
@@ -56,25 +57,36 @@ class AWSClient:
 
         response = yield tornado.gen.Task(self.http_client.fetch, request)
 
-        result = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers)}
+        result = {'code':response.code, 'headers':dict(response.headers)}
+
+        if response.code == 599:
+            result['status'] = 'error'
+            result['type'] = 'Internal'
+            result['message'] = response.error
+            self._ioloop.add_callback(functools.partial(callback, result))
+            return
+
 
         if not hasattr(handler, 'exception'):
             awsresponse = handler.getdict()
-            errorType, message = self.checkForErrors(awsresponse, response.status)
+            errorType, message = self.checkForErrors(awsresponse, response.code)
             if errorType is not False:
-                result['result'] = 'error'
+                result['status'] = 'error'
                 result['type'] = errorType
                 result['message'] = message
                 self._ioloop.add_callback(functools.partial(callback, result))
                 return
-            result['result'] = 'xml'
+            result['status'] = 'xml'
             #TODO: redirect handling
         else:
-            result['result'] = 'raw'
+            result['status'] = 'raw'
             awsresponse = ''.join(awsresponse)
+            if xmlexpected:
+                #Todo: yield error
+                pass
 
-        if statusexpected is not True and response.status not in statusexpected:
-            result['result'] = 'error'
+        if statusexpected is not True and response.code not in statusexpected:
+            result['status'] = 'error'
             result['type'] = 'AWSStatusException'
             result['message'] = ''
             self._ioloop.add_callback(functools.partial(callback, result))
@@ -82,5 +94,3 @@ class AWSClient:
 
         result['awsresponse'] = awsresponse
         self._ioloop.add_callback(functools.partial(callback, result))
-
-
