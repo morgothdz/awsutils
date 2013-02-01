@@ -1,0 +1,35 @@
+# awsutils/sqs/message.py
+# Copyright 2013 Sandor Attila Gerendi (Sanyi)
+#
+# This module is part of awsutils and is released under
+# the MIT License: http://www.opensource.org/licenses/mit-license.php
+
+from awsutils.exceptions.aws import UserInputException
+
+class SQSMessage:
+    def __init__(self, messageBody=None, queue=None):
+        self.messageBody = messageBody
+        self.receiptHandle = None
+        self.qName = None
+        self.queue = None
+
+    def getBody(self):
+        return self.messageBody
+
+    def setBody(self, messageBody):
+        self.messageBody = messageBody
+
+    def delete(self):
+        if self.queue in None:
+            raise UserInputException('This message does not belong to any queue')
+        self.queue.sqsservice.sqsclient.deleteMessage(self.queue.qName, self.receiptHandle)
+
+    def changeVisibility(self, visibilityTimeout):
+        if self.queue in None:
+            raise UserInputException('This message does not belong to any queue')
+        if self.receiptHandle in None:
+            raise UserInputException('This message does not have a receipt handle')
+        self.queue.sqsservice.sqsclient.changeMessageVisibility(self.queue.qName, self.receiptHandle, visibilityTimeout)
+
+    def __repr__(self):
+        return 'SQSMessage: ' + repr(self.__dict__)
