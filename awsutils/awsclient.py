@@ -17,7 +17,8 @@ except ImportError:  # Doesn't exist on OSX and other platforms
     select_poll = False
 
 from awsutils.utils.xmlhandler import AWSXMLHandler
-import awsutils.utils.auth as authutils
+from awsutils.exceptions.aws import AWSTimeout, AWSDataException, AWSPartialReception, AWSStatusException
+import awsutils.utils.auth as auth
 
 class AWSClient:
     MAX_IN_MEMORY_READ_CHUNK_SIZE_FOR_RAW_DATA = 1024 * 1024
@@ -72,7 +73,7 @@ class AWSClient:
 
         self.logger.debug("connecting to %s", destination)
         if self.secure:
-            #TODO: https contex (cerificate) checking
+            #TODO: https context (certificate) checking
             conn = http.client.HTTPSConnection(destination, timeout=timeout)
         else:
             conn = http.client.HTTPConnection(destination, timeout=timeout)
@@ -123,7 +124,7 @@ class AWSClient:
 
             conn = self.getConnection(destination=host, timeout=receptiontimeout)
 
-            headers, query, body = authutils.signRequest(access_key=self.access_key, secret_key=self.secret_key,
+            headers, query, body = auth.signRequest(access_key=self.access_key, secret_key=self.secret_key,
                                                          endpoint=host, region=region, service=service,
                                                          signmethod=signmethod, date=date,
                                                          uri=uri, method=method, headers=headers,
@@ -132,7 +133,7 @@ class AWSClient:
             self.logger.debug("Requesting %s %s %s query=%s headers=%s", method, host, uri, query, headers)
 
             if query != {}:
-                url = "%s?%s" % (uri, authutils.canonicalQueryString(query))
+                url = "%s?%s" % (uri, auth.canonicalQueryString(query))
             else:
                 url = uri
 
