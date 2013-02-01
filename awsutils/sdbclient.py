@@ -308,6 +308,8 @@ class SimpleDBClient(AWSClient):
             errors = awsresponse['Response']['Errors']['Error']
             if isinstance(errors, dict): errors = [errors]
             for error in errors:
+                self.boxUssage += error['BoxUsage']
+            for error in errors:
                 if error['Code'].replace('.','_') in self.EXCEPTIONS:
                     raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus,
                                                                           httpreason, httpheaders)
