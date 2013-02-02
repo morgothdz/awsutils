@@ -66,37 +66,29 @@ class AWSClient:
         result = {'code':response.code, 'headers':dict(response.headers)}
 
         if response.code == 599:
-            result['status'] = 'error'
-            result['type'] = 'Internal'
-            result['message'] = response.error
-            self._ioloop.add_callback(functools.partial(callback, result))
+            result['data'] = response.error
+            self._ioloop.add_callback(functools.partial(callback, False, result))
             return
-
 
         if not hasattr(handler, 'exception'):
-            awsresponse = handler.getdict()
-            errorType, message = self.checkForErrors(awsresponse, response.code)
-            if errorType is not False:
-                result['status'] = 'error'
-                result['type'] = errorType
-                result['message'] = message
-                self._ioloop.add_callback(functools.partial(callback, result))
+            data = handler.getdict()
+            try:
+                self.checkForErrors(awsresponse, response.code)
+            except Exception as e:
+                result['data'] = e
+                self._ioloop.add_callback(functools.partial(callback, (False, result)))
                 return
-            result['status'] = 'xml'
             #TODO: redirect handling
         else:
-            result['status'] = 'raw'
-            awsresponse = ''.join(awsresponse)
+            data = ''.join(awsresponse)
             if xmlexpected:
-                #Todo: yield error
-                pass
+                self._ioloop.add_callback(functools.partial(callback, (False, result)))
+                return
 
         if statusexpected is not True and response.code not in statusexpected:
-            result['status'] = 'error'
-            result['type'] = 'AWSStatusException'
-            result['message'] = ''
-            self._ioloop.add_callback(functools.partial(callback, result))
+            result['data'] = 'AWSStatusException'
+            self._ioloop.add_callback(functools.partial(callback, (False, result)))
             return
 
-        result['awsresponse'] = awsresponse
-        self._ioloop.add_callback(functools.partial(callback, result))
+        result['data'] = data
+        self._ioloop.add_callback(functools.partial(callback, (True, result)))
