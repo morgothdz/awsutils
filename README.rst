@@ -1,5 +1,5 @@
-**awsutils**, AWS (Amazon Web Services) interface python3 library
-=================================================================
+**awsutils**, AWS (Amazon Web Services) python3 library
+=======================================================
 
 Foreword
 --------
