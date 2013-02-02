@@ -1,5 +1,5 @@
-**awsutils** AWS (Amazon Web Services) python3 library
-===========================================================
+**awsutils**, AWS (Amazon Web Services) interface python3 library
+=================================================================
 
 Foreword
 --------
@@ -11,9 +11,10 @@ will be and useful addition to the python world.
 Highlights
 ----------
 #. Python3 compatible, it's developed using python3.2
-#. Amazon **SQS** low and high level handling with the most usual functions implemented
+#. Amazon **SQS** low and high level API with the most usual functions implemented
 #. Amazon **SimpleDB** low level API
-#. Amazon **SimpleDB** low level API **asynchronous** implementation based on **tornado**
+#. Amazon **SimpleDB** low level API **asynchronous** implementation based on **tornado**,
+   with the most usual functions implemented
 #. Amazon **S3** low level API (incomplete) and higher level API (incomplete), 
    still the S3Bucket contains two high level powerful file manipulation functions, making 
    large file upload and download secure and transparent.
@@ -32,6 +33,7 @@ Near Future Plans
 #. Clean-up and bugfixes
 #. Increase the generic AWSClient client reliability and power, ex: Support for HTTP 
    Expect: 100-continue, HTTPS certificate check, etc.
+#. Add more funcionality
 
 Help Needed On
 --------------
