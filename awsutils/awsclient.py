@@ -34,6 +34,7 @@ class AWSClient:
         self.connections = {}
         self.logger = logging.getLogger("%s.%s" % (type(self).__module__, type(self).__name__))
         self.logger.addHandler(logging.NullHandler())
+        self.count = {}
 
     def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
         """
@@ -136,6 +137,11 @@ class AWSClient:
                 url = "%s?%s" % (uri, auth.canonicalQueryString(query))
             else:
                 url = uri
+
+            #counting the requests
+            if method not in self.count:
+                self.count[method] = 0
+            self.count[method] += 1
 
             try:
                 conn.request(method=method, url=url, body=body, headers=headers)

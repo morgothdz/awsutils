@@ -21,6 +21,7 @@ class AWSClient:
         self.secret_key = secret_key
         self.secure = secure
         self._ioloop = _ioloop
+        self.count = {}
         self.http_client = tornado.httpclient.AsyncHTTPClient()
 
     def streamingCallback(self, incrementalParser, collector, data):
@@ -55,6 +56,12 @@ class AWSClient:
         streamingCallback = functools.partial(self.streamingCallback, incrementalParser, awsresponse)
 
         protocol = 'https' if self.secure else 'http'
+
+        #counting the requests
+        if method not in self.count:
+            self.count[method] = 0
+        self.count[method] += 1
+
         request = tornado.httpclient.HTTPRequest("%s://%s/?%s" % (protocol, endpoint, auth.canonicalQueryString(query)),
                                                  headers=headers, body=body, streaming_callback=streamingCallback,
                                                  connect_timeout=connect_timeout, request_timeout=request_timeout)
