@@ -48,15 +48,11 @@ class SimpleDbClient(AWSClient):
         @type nextToken: where to start the next list of ItemNames
         @type nextToken: str
         """
-        query = {}
-        query['Action'] = 'Select'
-        query['DomainName'] = domainName
-        query['SelectExpression'] = selectExpression
+        query = {'Action':'Select', 'DomainName':domainName, 'SelectExpression':selectExpression, 'Version': self.VERSION}
         if consistentRead:
             query['ConsistentRead'] = consistentRead
         if nextToken is not None:
             query['NextToken'] = nextToken
-        query['Version'] = self.VERSION
 
         status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
 
@@ -93,7 +89,7 @@ class SimpleDbClient(AWSClient):
         @rtype: list
         """
         if endpoint is None: endpoint = self.endpoint
-        query = {'Action': 'GetAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': '2009-04-15'}
+        query = {'Action': 'GetAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': self.VERSION}
         if attributeName is not None:
             query['AttributeName'] = attributeName
         if consistentRead is not None:
@@ -111,6 +107,194 @@ class SimpleDbClient(AWSClient):
                 else:
                     data = data['Attribute']
                     if isinstance(data, dict): data = [data]
+            except Exception as e:
+                stauts = False
+                data = e
+
+        self._ioloop.add_callback(functools.partial(callback, status, data))
+
+
+    def putAttributes(self, callback, domainName, itemName, attributes, expected=None, endpoint=None):
+        """
+        Set/modify atributes for itemName in domainName
+        http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/SDB_API_PutAttributes.html
+        @type callback: callback function params: (status, data)
+        @type callback: function
+        @param domainName: the name of the domain
+        @type domainName: str
+        @param itemName: the name of the item
+        @type itemName: str
+        @param attributes: the new attributes
+                      ex: {"someattributename" : "somevalue",
+                          "someotherattributename" : ("somevalue", True) #=> indicates force owerwrite
+                          }
+        @type attributes: dict
+        @param expected: manipulate the attributes only if this attributes exist
+                      ex: {"someattributename" : ("somevalue", 1),
+                          "someotherattributename" : ("somevalue", 0)}
+        @type expected: dict
+        """
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'PutAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': self.VERSION}
+        i = 1
+        for name in attributes:
+            query['Attribute.%d.Name'%(i,)] = name
+            value = attributes[name]
+            if isinstance(value, collections.Iterable):
+                query['Attribute.%d.Value'%(i,)] = attributes[name][0]
+                query['Attribute.%d.Value'%(i,)] = attributes[name][1]
+            else:
+                query['Attribute.%d.Replace'%(i,)] = attributes[name]
+            i += 1
+        if expected is not None:
+            i = 1
+            for name in expected:
+                query['Expected.%d.Name'%(i,)] = name
+                query['Expected.%d.Value'%(i,)] = expected[name][0]
+                query['Expected.%d.Exists'%(i,)] = expected[name][1]
+                i += 1
+
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+
+        if status is True:
+            try:
+                self.boxUssage += float(data['data']['PutAttributesResponse']['ResponseMetadata']['BoxUsage'])
+                data = None
+            except Exception as e:
+                stauts = False
+                data = e
+
+        self._ioloop.add_callback(functools.partial(callback, status, data))
+
+    def deleteAttributes(self, callback, domainName, itemName, attributes, expected=None, endpoint=None):
+        """
+        Delete atributes from itemName in domainName
+        http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/SDB_API_DeleteAttributes.html
+        @type callback: callback function params: (status, data)
+        @type callback: function
+        @param domainName: the name of the domain
+        @type domainName: str
+        @param itemName: the name of the item
+        @type itemName: str
+        @param attributes: the new attributes
+                      ex: {"someattributename" : 1,
+                          "someotherattributename" : 0
+                          }
+        @type attributes: dict
+        @param expected: manipulate the attributes only if this attributes exist
+                      ex: {"someattributename" : ("somevalue", 1),
+                          "someotherattributename" : ("somevalue", 0)}
+        @type expected: dict
+        """
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'DeleteAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': self.VERSION}
+        i = 1
+        for name in attributes:
+            query['Attribute.%d.Name'%(i,)] = name
+            value = attributes[name]
+            query['Attribute.%d.Value'%(i,)] = value
+            i += 1
+        if expected is not None:
+            i = 1
+            for name in expected:
+                query['Expected.%d.Name'%(i,)] = name
+                query['Expected.%d.Value'%(i,)] = expected[name][0]
+                query['Expected.%d.Exists'%(i,)] = expected[name][1]
+                i += 1
+
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+
+        if status is True:
+            try:
+                self.boxUssage += float(data['data']['DeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
+                data = None
+            except Exception as e:
+                stauts = False
+                data = e
+
+        self._ioloop.add_callback(functools.partial(callback, status, data))
+
+
+    def batchDeleteAttributes(self, callback, domainName, items, endpoint=None):
+        """
+        Delete atributes for multiple items
+        http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/SDB_API_BatchDeleteAttributes.html
+        @type callback: callback function params: (status, data)
+        @type callback: function
+        @param domainName: the name of the domain
+        @type domainName: str
+        @param items: items to have their attributes deleted
+                      ex: {"someItemname":{"someattributename" : 0,
+                                       "someotherattributename" : 0}
+                        "someotherItemname":{"someattributename" : 1}}
+        @type items: dict
+        """
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'BatchDeleteAttributes', 'DomainName':domainName, 'Version': self.VERSION}
+        i = 1
+        for itemName in items:
+            query['Item.%d.ItemName'%(i,)] = itemName
+            a = 1
+            for attributeName in items[itemName]:
+                query['Item.%d.Attribute.%d.name'%(i,a)] = attributeName
+                query['Item.%d.Attribute.%d.value'%(i,a)] = items[itemName][attributeName]
+                a += 1
+            i += 1
+
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+
+        if status is True:
+            try:
+                self.boxUssage += float(data['data']['BatchDeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
+                data = None
+            except Exception as e:
+                stauts = False
+                data = e
+
+        self._ioloop.add_callback(functools.partial(callback, status, data))
+
+    def batchPutAttributes(self, callback, domainName, items, endpoint=None):
+        """
+        Set/modify atributes for multiple items from a given domain
+        http://docs.aw.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/SDB_API_BatchPutAttributes.html
+        @type callback: callback function params: (status, data)
+        @type callback: function
+        @param domainName: the name of the domain
+        @type domainName: str
+        @param items: items to have their attributes manipulated
+                      ex: {"someItemname":{"someattributename" : "somevalue",
+                                       "someotherattributename" : ("somevalue", True) #=> indicates force owerwrite
+                                       }
+                        "someotherItemname":{"someattributename" : "somevalue"}}
+        @type items: dict
+        """
+        if endpoint is None: endpoint = self.endpoint
+        query = {'Action': 'BatchPutAttributes', 'DomainName':domainName, 'Version': '2009-04-15'}
+        i = 1
+        for itemName in items:
+            if i > 25:
+                raise UserInputException('25 item limit per BatchPutAttributes operation exceded')
+            query['Item.%d.ItemName'%(i,)] = itemName
+            a = 1
+            for attributeName in items[itemName]:
+                if a > 256:
+                    raise UserInputException('256 attribute name-value pairs per item exceded')
+                query['Item.%d.Attribute.%d.name'%(i,a)] = attributeName
+                v = items[itemName][attributeName]
+                if isinstance(v, collections.Iterable):
+                    query['Item.%d.Attribute.%d.value'%(i,a)] = v[0]
+                    query['Item.%d.Attribute.%d.replace'%(i,a)] = v[1]
+                else:
+                    query['Item.%d.Attribute.%d.value'%(i,a)] = v
+                a += 1
+            i += 1
+
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+
+        if status is True:
+            try:
+                self.boxUssage += float(data['data']['BatchPutAttributesResponse']['ResponseMetadata']['BoxUsage'])
+                data = None
             except Exception as e:
                 stauts = False
                 data = e
