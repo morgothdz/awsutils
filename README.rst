@@ -1,57 +1,51 @@
+**awsutils**, AWS (Amazon Web Services) python3 library
+=======================================================
+
 Foreword
-========
-While I was working on multiple projects I found myself more than once lacking
-a good python3.x amazon web services library, so I started scratching around the
-subject.
-
-The project I am working right now requires such a library, so the scratching
-turned to a full blown project: awsutils. And because the open source community
-was always such a great help, I humbly offer my work to the fellow programmers
-who my be in the same need as I was.
-
-For the beginning I will strictly add functionality only to cover my needs for
-the primary project I am currently workin on and to improve reliability. 
-Later I will expand more, based on users input and/or to cover other project 
-needs.
-
-Status
-======
-Pre-alpha, I am mostly planning and experimenting with the amazon protocols,
-there are a number of things working. Hopefully in the next few days or couple
-of weeks the most basic functionality required for S3 will be implemented and
-ready to be hammered by tests.
+--------
+While there already exists other python AWS library (boto) it lacks  
+**python3** support. For my projects (and I trust that for others too)
+**Python3** support and some asynchronous handling is a must. I hope **awsutils**
+will be and useful addition to the python world.
 
 Highlights
-==========
-#. Python3.x compatible amazon web services library
+----------
+#. Python3 compatible, it's developed using python3.2
+#. Amazon **SQS** low and high level API with the most usual functions implemented
+#. Amazon **SimpleDB** low level API
+#. Amazon **SimpleDB** low level API **asynchronous** implementation based on **tornado**,
+   with the most usual functions implemented
+#. Amazon **S3** low level API (incomplete) and higher level API (incomplete), 
+   still the S3Bucket contains two high level powerful file manipulation functions, making 
+   large file upload and download secure and transparent.
 #. HTTP connection pool with "Connection: keep-alive"
-#. Direct amazon api like access seconded by higher level access encapsulated 
-   in various classes (ex: the generic s3client then the higher level s3.service, 
-   s3.bucket and s3.object classes)
-#. S3 support (limited yet)
+#. Structured on two levels, a low level translating directly the amazon API's, 
+   and a higher one, where things are organized in classes etc..
 
+Status
+------
+Slowly reaching the alpha status, hopefully in the next couple of weeks the structure will 
+freeze.
 
 Near Future Plans
-=================
-#. Solve the TODO's and exit Pre-alpha status :)
-#. Support for HTTP Expect: 100-continue
-#. HTTPS certificate check
-#. Cleanup and bugfixes
-#. Increase the generic AWSClient client reliability
-#. Expanding S3 support and reliability
-#. Amazon Simple DB support
+-----------------
+#. Solve the TODO's and reach the alpha status
+#. Clean-up and bugfixes
+#. Increase the generic AWSClient client reliability and power, ex: Support for HTTP 
+   Expect: 100-continue, HTTPS certificate check, etc.
+#. Add more funcionality
 
 Help Needed On
-==============
+--------------
 #. Testing out functionality and report any bugs or problems.
 #. Documentation
 #. Automated tests
-#. I am not planning python2.x features, there is the "boto" project more than
-   enough for cover that road.
-#. My english is pretty poor so feel free on helping me to the right track :)
+#. Correct my language mistakes.
+#. I am not planning python2.x features, there is the **boto** more than
+   enough for that path.
 
 Contributing
-============
+------------
 #. `Check for open issues <https://github.com/sanyi/awsutils/issues>`_ or open
    a fresh issue to start a discussion around a feature idea or a bug.
 #. Fork the `awsutils repository on Github <https://github.com/sanyi/awsutils.git>`_
