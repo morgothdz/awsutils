@@ -4,7 +4,7 @@
 # This module is part of awsutils and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
 
-import functools
+import functools, collections
 import tornado.gen
 from awsutils.tornado.awsclient import AWSClient
 from awsutils.exceptions.aws import UserInputException, extractExceptionsFromModule2Dicitonary
