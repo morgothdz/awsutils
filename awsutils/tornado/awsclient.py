@@ -33,7 +33,7 @@ class AWSClient:
         except Exception as e:
             incrementalParser._cont_handler.exception = e
 
-    def checkForErrors(self, awsresponse, httpstatus):
+    def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
         pass
 
     @tornado.gen.engine
@@ -80,7 +80,7 @@ class AWSClient:
         if not hasattr(handler, 'exception'):
             data = handler.getdict()
             try:
-                self.checkForErrors(awsresponse, response.code)
+                self.checkForErrors(awsresponse, response.code, '', response.headers)
             except Exception as e:
                 result['data'] = e
                 self._ioloop.add_callback(functools.partial(callback, (False, result)))

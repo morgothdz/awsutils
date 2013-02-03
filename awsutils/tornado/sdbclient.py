@@ -20,7 +20,7 @@ class SimpleDbClient(AWSClient):
         self.boxUssage = 0
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
 
-    def checkForErrors(self, awsresponse, httpstatus):
+    def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
         if 'Response' in awsresponse and 'Errors' in awsresponse['Response']:
             #raise the first error we found
             errors = awsresponse['Response']['Errors']['Error']
@@ -29,8 +29,7 @@ class SimpleDbClient(AWSClient):
                 self.boxUssage += error['BoxUsage']
             for error in errors:
                 if error['Code'].replace('.','_') in self.EXCEPTIONS:
-                    raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus,
-                        httpreason, httpheaders)
+                    raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus)
             else:
                 raise awsutils.exceptions.sdb.SDBException(awsresponse, httpstatus, httpreason, httpheaders)
 
