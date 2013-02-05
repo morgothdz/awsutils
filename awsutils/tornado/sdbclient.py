@@ -9,29 +9,15 @@ import tornado.gen
 from awsutils.tornado.awsclient import AWSClient
 from awsutils.exceptions.aws import UserInputException, extractExceptionsFromModule2Dicitonary
 import awsutils.exceptions.sdb
-import awsutils.utils.auth as auth
+from awsutils.utils.auth import SIGNATURE_V2
 
 class SimpleDbClient(AWSClient):
     VERSION = '2009-04-15'
-    EXCEPTIONS = extractExceptionsFromModule2Dicitonary('awsutils.exceptions.sdb',
-                                                        awsutils.exceptions.sdb.SDBException)
 
-    def __init__(self, endpoint, access_key, secret_key, secure=False):
+    def __init__(self, endpoint, access_key, secret_key, _ioloop=None, secure=False):
         self.boxUssage = 0
+        self._ioloop = _ioloop
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
-
-    def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
-        if 'Response' in awsresponse and 'Errors' in awsresponse['Response']:
-            #raise the first error we found
-            errors = awsresponse['Response']['Errors']['Error']
-            if isinstance(errors, dict): errors = [errors]
-            for error in errors:
-                self.boxUssage += error['BoxUsage']
-            for error in errors:
-                if error['Code'].replace('.','_') in self.EXCEPTIONS:
-                    raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus)
-            else:
-                raise awsutils.exceptions.sdb.SDBException(awsresponse, httpstatus, httpreason, httpheaders)
 
     @tornado.gen.engine
     def select(self, callback, domainName, selectExpression, consistentRead = False, nextToken = None):
@@ -53,7 +39,7 @@ class SimpleDbClient(AWSClient):
         if nextToken is not None:
             query['NextToken'] = nextToken
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
 
         if status is True:
             try:
@@ -94,7 +80,7 @@ class SimpleDbClient(AWSClient):
         if consistentRead is not None:
             query['ConsistentRead'] = consistentRead
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
 
         if status is True:
             try:
@@ -153,7 +139,7 @@ class SimpleDbClient(AWSClient):
                 query['Expected.%d.Exists'%(i,)] = expected[name][1]
                 i += 1
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
 
         if status is True:
             try:
@@ -201,7 +187,7 @@ class SimpleDbClient(AWSClient):
                 query['Expected.%d.Exists'%(i,)] = expected[name][1]
                 i += 1
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
 
         if status is True:
             try:
@@ -240,7 +226,7 @@ class SimpleDbClient(AWSClient):
                 a += 1
             i += 1
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
 
         if status is True:
             try:
@@ -288,7 +274,7 @@ class SimpleDbClient(AWSClient):
                 a += 1
             i += 1
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=auth.SIGNATURE_V2)
+        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
 
         if status is True:
             try:
@@ -299,3 +285,21 @@ class SimpleDbClient(AWSClient):
                 data = e
 
         self._ioloop.add_callback(functools.partial(callback, status, data))
+
+
+    #================================== helper functionality ===========================================================
+    EXCEPTIONS = extractExceptionsFromModule2Dicitonary('awsutils.exceptions.sdb',
+                                                        awsutils.exceptions.sdb.SDBException)
+
+    def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
+        if 'Response' in awsresponse and 'Errors' in awsresponse['Response']:
+            #raise the first error we found
+            errors = awsresponse['Response']['Errors']['Error']
+            if isinstance(errors, dict): errors = [errors]
+            for error in errors:
+                self.boxUssage += error['BoxUsage']
+            for error in errors:
+                if error['Code'].replace('.','_') in self.EXCEPTIONS:
+                    raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus)
+            else:
+                raise awsutils.exceptions.sdb.SDBException(awsresponse, httpstatus, httpreason, httpheaders)
