@@ -38,7 +38,9 @@ class SQSClient(AWSClient):
     @tornado.gen.engine
     def deleteMessage(self, callback, qName, receiptHandle):
         query = {'Action': 'DeleteMessage', 'ReceiptHandle': receiptHandle, 'Version': '2012-11-05'}
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V4_HEADERS)
+        status, data = yield tornado.gen.Task(self.request, query=query,
+                                              uri="/%s/%s" % (self.accNumber, qName),
+                                              signmethod=SIGNATURE_V4_HEADERS)
         if status is True:
             try:
                 data['awsresponse']['DeleteMessageResponse']
@@ -51,6 +53,26 @@ class SQSClient(AWSClient):
     def sendMessage(self, callback, qName, messageBody, delaySeconds=None, hashcheck=False):
         #TODO: implement
         pass
+
+
+    @tornado.gen.engine
+    def changeMessageVisibility(self, callback, qName, receiptHandle, visibilityTimeout):
+        """
+        @param qName: the sqs queue name
+        @type qName: str
+        """
+        query = {'Action': 'ChangeMessageVisibility', 'ReceiptHandle': receiptHandle,
+                 'VisibilityTimeout': visibilityTimeout, 'Version': '2012-11-05'}
+        status, data = yield tornado.gen.Task(self.request, query=query,
+                                              uri="/%s/%s" % (self.accNumber, qName),
+                                              signmethod=SIGNATURE_V4_HEADERS)
+        if status is True:
+            try:
+                data['awsresponse']['ChangeMessageVisibilityResponse']
+            except Exception as e:
+                stauts = False
+                data = e
+        self._ioloop.add_callback(functools.partial(callback, status, data))
 
 
     #================================== helper functionality ===========================================================
