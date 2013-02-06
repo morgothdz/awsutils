@@ -93,8 +93,8 @@ class SQSQueue:
     def messages(self, attributes='All', visibilityTimeout=None, autodelete=True, neverfail=True):
         """
         Generator to retrieve infinitely messages from a queue
+        @param visibilityTimeout:
         @type visibilityTimeout: int
-        @type waitTimeSeconds: int
         @param autodelete: the message deletion will be attempted upon release
         @type autodelete: bool
         @param neverfail: don't fail on aws exceptions
