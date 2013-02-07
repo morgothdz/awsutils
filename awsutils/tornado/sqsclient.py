@@ -32,8 +32,35 @@ class SQSClient(AWSClient):
     @tornado.gen.engine
     def receiveMessage(self, callback, qName, attributes=None, maxNumberOfMessages=None, visibilityTimeout=None,
                        waitTimeSeconds=None):
-        #TODO: implement
-        pass
+        query = {'Action': 'ReceiveMessage', 'Version': '2012-11-05'}
+        if maxNumberOfMessages is not None:
+            query['MaxNumberOfMessages'] = maxNumberOfMessages
+        if visibilityTimeout is not None:
+            query['VisibilityTimeout'] = visibilityTimeout
+        if waitTimeSeconds is not None:
+            query['WaitTimeSeconds'] = waitTimeSeconds
+        if isinstance(attributes, str):
+            query['AttributeName.1'] = attributes
+        elif isinstance(attributes, list):
+            for i in range(0, len(attributes)):
+                query['AttributeName.%d' % (i + 1,)] = attributes[i]
+
+        status, data = yield tornado.gen.Task(self.request, query=query,
+            uri="/%s/%s" % (self.accNumber, qName),
+            signmethod=SIGNATURE_V4_HEADERS)
+        if status is True:
+            try:
+                data = data['awsresponse']['ReceiveMessageResponse']['ReceiveMessageResult']
+                if not isinstance(data, dict):
+                    data = None
+                elif isinstance(data['Message'], dict):
+                    data =  [data['Message']]
+                else:
+                    data = data['Message']
+            except Exception as e:
+                stauts = False
+                data = e
+        self._ioloop.add_callback(functools.partial(callback, status, data))
 
     @tornado.gen.engine
     def deleteMessage(self, callback, qName, receiptHandle):
@@ -51,8 +78,21 @@ class SQSClient(AWSClient):
 
     @tornado.gen.engine
     def sendMessage(self, callback, qName, messageBody, delaySeconds=None, hashcheck=False):
-        #TODO: implement
-        pass
+        query = {'Action': 'SendMessage', 'MessageBody': messageBody, 'Version': '2012-11-05'}
+        if delaySeconds is not None:
+            if delaySeconds > 900:
+                raise UserInputException('param delaySeconds too big (max 900 seconds)')
+            query['DelaySeconds'] = delaySeconds
+        status, data = yield tornado.gen.Task(self.request, query=query,
+                                              uri="/%s/%s" % (self.accNumber, qName),
+                                              signmethod=SIGNATURE_V4_HEADERS)
+        if status is True:
+            try:
+                data['awsresponse']['SendMessageResponse']['SendMessageResult']['MD5OfMessageBody']
+            except Exception as e:
+                stauts = False
+                data = e
+        self._ioloop.add_callback(functools.partial(callback, status, data))
 
 
     @tornado.gen.engine
