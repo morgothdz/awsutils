@@ -12,10 +12,23 @@ from awsutils.exceptions.aws import UserInputException, extractExceptionsFromMod
 import awsutils.exceptions.sqs
 from awsutils.utils.auth import SIGNATURE_V4_HEADERS
 
-
 class SQSClient(AWSClient):
 
     def __init__(self, endpoint, access_key, secret_key, _ioloop=None, accNumber=None, secure=False):
+        """
+        @type endpoint: the amazon endpoint of the service
+        @type endpoint: str
+        @type access_key: amazon access key
+        @type access_key: str
+        @type secret_key: amazon secret key
+        @type secret_key: str
+        @type secure: use https
+        @type accNumber: the amazon user id (account number), if None the client will try to fetch the info with IAMClient
+        @type accNumber: str
+        @type secure: bool
+        @type _ioloop: the tornado ioloop for processing the events
+        @type _ioloop: tornado.ioloop.IOLoop
+        """
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure, _ioloop = _ioloop)
         #try to retrieve the curent user's account number
         if accNumber is None:

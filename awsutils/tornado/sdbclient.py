@@ -15,6 +15,18 @@ class SimpleDbClient(AWSClient):
     VERSION = '2009-04-15'
 
     def __init__(self, endpoint, access_key, secret_key, _ioloop=None, secure=False):
+        """
+        @type endpoint: the amazon endpoint of the service
+        @type endpoint: str
+        @type access_key: amazon access key
+        @type access_key: str
+        @type secret_key: amazon secret key
+        @type secret_key: str
+        @type secure: use https
+        @type secure: bool
+        @type _ioloop: the tornado ioloop for processing the events
+        @type _ioloop: tornado.ioloop.IOLoop
+        """
         self.boxUssage = 0
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure, _ioloop = _ioloop)
 
@@ -31,6 +43,8 @@ class SimpleDbClient(AWSClient):
         @type consistentRead: bool
         @type nextToken: where to start the next list of ItemNames
         @type nextToken: str
+        @return: a list of dictionaries
+        @rtype: list
         """
         query = {'Action':'Select', 'DomainName':domainName, 'SelectExpression':selectExpression, 'Version': self.VERSION}
         if consistentRead:
@@ -44,7 +58,6 @@ class SimpleDbClient(AWSClient):
         self.boxUssage += float(data['SelectResponse']['ResponseMetadata']['BoxUsage'])
         selectresult = data['SelectResponse']['SelectResult']['Item']
         if isinstance(selectresult, dict): selectresult = [selectresult]
-
         self._ioloop.add_callback(functools.partial(callback, selectresult))
 
 
@@ -64,6 +77,8 @@ class SimpleDbClient(AWSClient):
         @param consistentRead: when set to true, ensures that the most recent data is returned
         @type consistentRead: bool
         @return: a list of attributes
+        @rtype: list
+        @return: a list of dictionaries
         @rtype: list
         """
         if endpoint is None: endpoint = self.endpoint
@@ -107,6 +122,8 @@ class SimpleDbClient(AWSClient):
                       ex: {"someattributename" : ("somevalue", 1),
                           "someotherattributename" : ("somevalue", 0)}
         @type expected: dict
+        @return: returns True on success or raise exceptions
+        @rtype: bool
         """
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'PutAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': self.VERSION}
@@ -153,6 +170,8 @@ class SimpleDbClient(AWSClient):
                       ex: {"someattributename" : ("somevalue", 1),
                           "someotherattributename" : ("somevalue", 0)}
         @type expected: dict
+        @return: returns True on success or raise exceptions
+        @rtype: bool
         """
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'DeleteAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': self.VERSION}
@@ -189,6 +208,8 @@ class SimpleDbClient(AWSClient):
                                        "someotherattributename" : 0}
                         "someotherItemname":{"someattributename" : 1}}
         @type items: dict
+        @return: returns True on success or raise exceptions
+        @rtype: bool
         """
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'BatchDeleteAttributes', 'DomainName':domainName, 'Version': self.VERSION}
@@ -221,6 +242,8 @@ class SimpleDbClient(AWSClient):
                                        }
                         "someotherItemname":{"someattributename" : "somevalue"}}
         @type items: dict
+        @return: returns True on success or raise exceptions
+        @rtype: bool
         """
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'BatchPutAttributes', 'DomainName':domainName, 'Version': '2009-04-15'}

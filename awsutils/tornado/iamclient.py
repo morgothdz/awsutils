@@ -9,6 +9,14 @@ class SimpleDbClient(AWSClient):
     VERSION = '2010-05-08'
 
     def __init__(self, access_key, secret_key, _ioloop=None):
+        """
+        @type access_key: amazon access key
+        @type access_key: str
+        @type secret_key: amazon secret key
+        @type secret_key: str
+        @type _ioloop: the tornado ioloop for processing the events
+        @type _ioloop: tornado.ioloop.IOLoop
+        """
         AWSClient.__init__(self, 'iam.amazonaws.com', access_key, secret_key, secure=True, _ioloop = _ioloop)
 
     @tornado.gen.engine

@@ -18,6 +18,18 @@ import awsutils.utils.auth as auth
 
 class AWSClient:
     def __init__(self, endpoint, access_key, secret_key, secure=False, _ioloop=None):
+        """
+        @type endpoint: the amazon endpoint of the service
+        @type endpoint: str
+        @type access_key: amazon access key
+        @type access_key: str
+        @type secret_key: amazon secret key
+        @type secret_key: str
+        @type secure: use https
+        @type secure: bool
+        @type _ioloop: the tornado ioloop for processing the events
+        @type _ioloop: tornado.ioloop.IOLoop
+        """
         self.endpoint = endpoint
         self.access_key = access_key
         self.secret_key = secret_key
