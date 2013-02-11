@@ -20,16 +20,16 @@ class SQSService:
             attributes = self.sqsclient.getQueueAttributes(qName)
         except AWS_SimpleQueueService_NonExistentQueue:
             return None
-        query = SQSQueue(qName, self)
+        query = SQSQueue(qName, self.sqsclient, False)
         for attribute in attributes:
             setattr(query, attribute['Name'], attribute['Value'])
         return query
 
-    def createQuery(self, qName, delaySeconds=None, maximumMessageSize=None, messageRetentionPeriod=None,
+    def createQueue(self, qName, delaySeconds=None, maximumMessageSize=None, messageRetentionPeriod=None,
                     receiveMessageWaitTimeSeconds=None, visibilityTimeout=None, policy=None):
         self.sqsclient.createQueue(qName, delaySeconds, maximumMessageSize, messageRetentionPeriod,
                                    receiveMessageWaitTimeSeconds, visibilityTimeout, policy)
         return self.getQuery(qName)
 
-    def deleteQuery(self, qName):
+    def deleteQueue(self, qName):
         self.sqsclient.deleteQueue(qName)

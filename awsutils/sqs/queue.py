@@ -11,23 +11,26 @@ from awsutils.sqs.message import SQSMessage
 class SQSQueue:
     COOLDOWN_BETWEEN_RECEIVEMESSAGES = 1
 
-    def __init__(self, qName, sqsservice):
+    def __init__(self, qName, sqsclient, loadAttributes=True):
         """
         @param qName: the SQS queue name
         @type qName: str
-        @param sqsservice: the s3client to be used for communication
-        @type sqsservice: SQSService
+        @param sqsclient: the s3client to be used for communication
+        @type sqsclient: SQSClient
         """
+        self.VisibilityTimeout = 60
         self.qName = qName
-        self.sqsservice = sqsservice
+        self.sqsclient = sqsclient
         self.logger = logging.getLogger("%s.%s" % (type(self).__module__, type(self).__name__))
         self.logger.addHandler(logging.NullHandler())
+        if loadAttributes:
+            self.refresh()
 
     def refresh(self):
         """
         Refresh the queue attributes
         """
-        attributes = self.sqsservice.sqsclient.getQueueAttributes(self.qName)
+        attributes = self.sqsclient.getQueueAttributes(self.qName)
         for attribute in attributes:
             setattr(self, attribute['Name'], attribute['Value'])
 
@@ -38,14 +41,14 @@ class SQSQueue:
         """
         if message.messageBody is None:
             raise UserInputException('this message has no body')
-        self.sqsservice.sqsclient.sendMessage(self.qName, message.messageBody, delaySeconds)
+        self.sqsclient.sendMessage(self.qName, message.messageBody, delaySeconds)
 
     def delete(self, message):
         if message.receiptHandle is None:
             raise UserInputException('this message does not have receiptHandle set')
         if message.queue != self:
             raise UserInputException('this message does not belong to this queue')
-        self.sqsservice.sqsclient.deleteMessage(message.queue.qName, message.receiptHandle)
+        self.sqsclient.deleteMessage(message.queue.qName, message.receiptHandle)
         message.queue = None
         message.receiptHandle = None
 
@@ -55,9 +58,10 @@ class SQSQueue:
         @type waitTimeSeconds: int
         @type maxNumberOfMessages: int
         """
+        messages = []
         if waitTimeSeconds is None or waitTimeSeconds <= 20:
-            messages = self.sqsservice.sqsclient.receiveMessage(self.qName, attributes, maxNumberOfMessages,
-                                                              visibilityTimeout, waitTimeSeconds)
+            messages = self.sqsclient.receiveMessage(self.qName, attributes, maxNumberOfMessages,
+                                                     visibilityTimeout, waitTimeSeconds)
         else:
             starttime = int(time.time())
             while True:
@@ -66,8 +70,8 @@ class SQSQueue:
                 if _waitTimeSeconds <= 0:
                     return None
                 print(time.time(), waitTimeSeconds, _waitTimeSeconds)
-                messages = self.sqsservice.sqsclient.receiveMessage(self.qName, attributes, maxNumberOfMessages,
-                                                                    visibilityTimeout, _waitTimeSeconds)
+                messages = self.sqsclient.receiveMessage(self.qName, attributes, maxNumberOfMessages,
+                                                         visibilityTimeout, _waitTimeSeconds)
                 if messages != []:
                     break
                 time.sleep(self.COOLDOWN_BETWEEN_RECEIVEMESSAGES)
@@ -103,13 +107,13 @@ class SQSQueue:
         """
         while True:
             try:
-                items = self.sqsservice.sqsclient.receiveMessage(self.qName, attributes,
-                                                                 maxNumberOfMessages = 1,
-                                                                 visibilityTimeout = visibilityTimeout,
-                                                                 waitTimeSeconds = 20)
+                items = self.sqsclient.receiveMessage(self.qName, attributes,
+                                                      maxNumberOfMessages = 1,
+                                                      visibilityTimeout = visibilityTimeout,
+                                                      waitTimeSeconds = 20)
             except Exception as e:
                 if neverfail:
-                    self.logger.warn('receiveMessage error %s [%s]', message, e)
+                    self.logger.warn('receiveMessage error [%s]', e)
                     time.sleep(self.COOLDOWN_BETWEEN_RECEIVEMESSAGES)
                     continue
                 raise
