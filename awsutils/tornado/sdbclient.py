@@ -16,8 +16,7 @@ class SimpleDbClient(AWSClient):
 
     def __init__(self, endpoint, access_key, secret_key, _ioloop=None, secure=False):
         self.boxUssage = 0
-        self._ioloop = _ioloop
-        AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
+        AWSClient.__init__(self, endpoint, access_key, secret_key, secure, _ioloop = _ioloop)
 
     @tornado.gen.engine
     def select(self, callback, domainName, selectExpression, consistentRead = False, nextToken = None):
@@ -39,20 +38,14 @@ class SimpleDbClient(AWSClient):
         if nextToken is not None:
             query['NextToken'] = nextToken
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
+        data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
 
-        if status is True:
-            try:
-                data = data['data']
-                self.boxUssage += float(data['SelectResponse']['ResponseMetadata']['BoxUsage'])
-                selectresult = data['SelectResponse']['SelectResult']['Item']
-                if isinstance(selectresult, dict): selectresult = [selectresult]
-                data = selectresult
-            except Exception as e:
-                stauts = False
-                data = e
+        data = data['data']
+        self.boxUssage += float(data['SelectResponse']['ResponseMetadata']['BoxUsage'])
+        selectresult = data['SelectResponse']['SelectResult']['Item']
+        if isinstance(selectresult, dict): selectresult = [selectresult]
 
-        self._ioloop.add_callback(functools.partial(callback, status, data))
+        self._ioloop.add_callback(functools.partial(callback, selectresult))
 
 
     @tornado.gen.engine
@@ -80,25 +73,21 @@ class SimpleDbClient(AWSClient):
         if consistentRead is not None:
             query['ConsistentRead'] = consistentRead
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
+        data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
 
-        if status is True:
-            try:
-                data = data['data']
-                self.boxUssage += float(data['GetAttributesResponse']['ResponseMetadata']['BoxUsage'])
-                data = data['GetAttributesResponse']['GetAttributesResult']
-                if isinstance(data, str):
-                    data = None
-                else:
-                    data = data['Attribute']
-                    if isinstance(data, dict): data = [data]
-            except Exception as e:
-                stauts = False
-                data = e
+        data = data['data']
+        self.boxUssage += float(data['GetAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        data = data['GetAttributesResponse']['GetAttributesResult']
+        if isinstance(data, str):
+            data = None
+        else:
+            data = data['Attribute']
+            if isinstance(data, dict): data = [data]
 
-        self._ioloop.add_callback(functools.partial(callback, status, data))
+        self._ioloop.add_callback(functools.partial(callback, data))
 
 
+    @tornado.gen.engine
     def putAttributes(self, callback, domainName, itemName, attributes, expected=None, endpoint=None):
         """
         Set/modify atributes for itemName in domainName
@@ -125,9 +114,10 @@ class SimpleDbClient(AWSClient):
         for name in attributes:
             query['Attribute.%d.Name'%(i,)] = name
             value = attributes[name]
+            if not isinstance(value, str): value = repr(value)
             if isinstance(value, collections.Iterable):
-                query['Attribute.%d.Value'%(i,)] = attributes[name][0]
-                query['Attribute.%d.Value'%(i,)] = attributes[name][1]
+                query['Attribute.%d.Value'%(i,)] = attributes[name]
+                query['Attribute.%d.Value'%(i,)] = attributes[name]
             else:
                 query['Attribute.%d.Replace'%(i,)] = attributes[name]
             i += 1
@@ -135,22 +125,15 @@ class SimpleDbClient(AWSClient):
             i = 1
             for name in expected:
                 query['Expected.%d.Name'%(i,)] = name
-                query['Expected.%d.Value'%(i,)] = expected[name][0]
-                query['Expected.%d.Exists'%(i,)] = expected[name][1]
+                query['Expected.%d.Value'%(i,)] = expected[name]
+                query['Expected.%d.Exists'%(i,)] = expected[name]
                 i += 1
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
+        data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
+        self.boxUssage += float(data['data']['PutAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        self._ioloop.add_callback(functools.partial(callback, True))
 
-        if status is True:
-            try:
-                self.boxUssage += float(data['data']['PutAttributesResponse']['ResponseMetadata']['BoxUsage'])
-                data = None
-            except Exception as e:
-                stauts = False
-                data = e
-
-        self._ioloop.add_callback(functools.partial(callback, status, data))
-
+    @tornado.gen.engine
     def deleteAttributes(self, callback, domainName, itemName, attributes, expected=None, endpoint=None):
         """
         Delete atributes from itemName in domainName
@@ -187,19 +170,12 @@ class SimpleDbClient(AWSClient):
                 query['Expected.%d.Exists'%(i,)] = expected[name][1]
                 i += 1
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
-
-        if status is True:
-            try:
-                self.boxUssage += float(data['data']['DeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
-                data = None
-            except Exception as e:
-                stauts = False
-                data = e
-
-        self._ioloop.add_callback(functools.partial(callback, status, data))
+        data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
+        self.boxUssage += float(data['data']['DeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        self._ioloop.add_callback(functools.partial(callback, True))
 
 
+    @tornado.gen.engine
     def batchDeleteAttributes(self, callback, domainName, items, endpoint=None):
         """
         Delete atributes for multiple items
@@ -226,18 +202,11 @@ class SimpleDbClient(AWSClient):
                 a += 1
             i += 1
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
+        data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
+        self.boxUssage += float(data['data']['BatchDeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        self._ioloop.add_callback(functools.partial(callback, True))
 
-        if status is True:
-            try:
-                self.boxUssage += float(data['data']['BatchDeleteAttributesResponse']['ResponseMetadata']['BoxUsage'])
-                data = None
-            except Exception as e:
-                stauts = False
-                data = e
-
-        self._ioloop.add_callback(functools.partial(callback, status, data))
-
+    @tornado.gen.engine
     def batchPutAttributes(self, callback, domainName, items, endpoint=None):
         """
         Set/modify atributes for multiple items from a given domain
@@ -274,17 +243,9 @@ class SimpleDbClient(AWSClient):
                 a += 1
             i += 1
 
-        status, data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
-
-        if status is True:
-            try:
-                self.boxUssage += float(data['data']['BatchPutAttributesResponse']['ResponseMetadata']['BoxUsage'])
-                data = None
-            except Exception as e:
-                stauts = False
-                data = e
-
-        self._ioloop.add_callback(functools.partial(callback, status, data))
+        data = yield tornado.gen.Task(self.request, query=query, signmethod=SIGNATURE_V2)
+        self.boxUssage += float(data['data']['BatchPutAttributesResponse']['ResponseMetadata']['BoxUsage'])
+        self._ioloop.add_callback(functools.partial(callback, True))
 
 
     #================================== helper functionality ===========================================================

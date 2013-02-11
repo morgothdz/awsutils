@@ -12,14 +12,18 @@ import tornado.gen
 import tornado.httpclient
 
 from awsutils.utils.xmlhandler import AWSXMLHandler
+from awsutils.exceptions.aws import AWSStatusException, AWSDataException
 import awsutils.utils.auth as auth
 
+
 class AWSClient:
-    def __init__(self, endpoint, access_key, secret_key, secure=False, _ioloop=tornado.ioloop.IOLoop.instance()):
+    def __init__(self, endpoint, access_key, secret_key, secure=False, _ioloop=None):
         self.endpoint = endpoint
         self.access_key = access_key
         self.secret_key = secret_key
         self.secure = secure
+        if _ioloop is None:
+            _ioloop = tornado.ioloop.IOLoop.instance()
         self._ioloop = _ioloop
         self.count = {}
         self.http_client = tornado.httpclient.AsyncHTTPClient()
@@ -70,32 +74,22 @@ class AWSClient:
 
         response = yield tornado.gen.Task(self.http_client.fetch, request)
 
-        result = {'code':response.code, 'headers':dict(response.headers)}
+        resultdata = {'status':response.code, 'headers':dict(response.headers), 'data':None}
 
         if response.code == 599:
-            result['data'] = response.error
-            self._ioloop.add_callback(functools.partial(callback, False, result))
-            return
+            raise AWSStatusException(resultdata)
 
         if not hasattr(handler, 'exception'):
             data = handler.getdict()
-            try:
-                self.checkForErrors(awsresponse, response.code, '', response.headers)
-            except Exception as e:
-                result['data'] = e
-                self._ioloop.add_callback(functools.partial(callback, (False, result)))
-                return
+            self.checkForErrors(awsresponse, response.code, '', response.headers)
             #TODO: redirect handling
         else:
             data = ''.join(awsresponse)
             if xmlexpected:
-                self._ioloop.add_callback(functools.partial(callback, (False, result)))
-                return
+                raise AWSDataException('xml-expected')
 
+        resultdata['data'] = data
         if statusexpected is not True and response.code not in statusexpected:
-            result['data'] = 'AWSStatusException'
-            self._ioloop.add_callback(functools.partial(callback, (False, result)))
-            return
+            raise AWSStatusException(resultdata)
 
-        result['data'] = data
-        self._ioloop.add_callback(functools.partial(callback, (True, result)))
+        self._ioloop.add_callback(functools.partial(callback, resultdata))

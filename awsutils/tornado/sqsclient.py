@@ -16,8 +16,7 @@ from awsutils.utils.auth import SIGNATURE_V4_HEADERS
 class SQSClient(AWSClient):
 
     def __init__(self, endpoint, access_key, secret_key, _ioloop=None, accNumber=None, secure=False):
-        self._ioloop = _ioloop
-        AWSClient.__init__(self, endpoint, access_key, secret_key, secure)
+        AWSClient.__init__(self, endpoint, access_key, secret_key, secure, _ioloop = _ioloop)
         #try to retrieve the curent user's account number
         if accNumber is None:
             #TODO, we should do this asynchronous
@@ -45,36 +44,24 @@ class SQSClient(AWSClient):
             for i in range(0, len(attributes)):
                 query['AttributeName.%d' % (i + 1,)] = attributes[i]
 
-        status, data = yield tornado.gen.Task(self.request, query=query,
-            uri="/%s/%s" % (self.accNumber, qName),
-            signmethod=SIGNATURE_V4_HEADERS)
-        if status is True:
-            try:
-                data = data['awsresponse']['ReceiveMessageResponse']['ReceiveMessageResult']
-                if not isinstance(data, dict):
-                    data = None
-                elif isinstance(data['Message'], dict):
-                    data =  [data['Message']]
-                else:
-                    data = data['Message']
-            except Exception as e:
-                stauts = False
-                data = e
-        self._ioloop.add_callback(functools.partial(callback, status, data))
+        data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
+                                      signmethod=SIGNATURE_V4_HEADERS)
+        data = data['awsresponse']['ReceiveMessageResponse']['ReceiveMessageResult']
+        if not isinstance(data, dict):
+            data = None
+        elif isinstance(data['Message'], dict):
+            data =  [data['Message']]
+        else:
+            data = data['Message']
+        self._ioloop.add_callback(functools.partial(callback, data))
 
     @tornado.gen.engine
     def deleteMessage(self, callback, qName, receiptHandle):
         query = {'Action': 'DeleteMessage', 'ReceiptHandle': receiptHandle, 'Version': '2012-11-05'}
-        status, data = yield tornado.gen.Task(self.request, query=query,
-                                              uri="/%s/%s" % (self.accNumber, qName),
-                                              signmethod=SIGNATURE_V4_HEADERS)
-        if status is True:
-            try:
-                data['awsresponse']['DeleteMessageResponse']
-            except Exception as e:
-                stauts = False
-                data = e
-        self._ioloop.add_callback(functools.partial(callback, status, data))
+        data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
+                                      signmethod=SIGNATURE_V4_HEADERS)
+        data['awsresponse']['DeleteMessageResponse']
+        self._ioloop.add_callback(functools.partial(callback, True))
 
     @tornado.gen.engine
     def sendMessage(self, callback, qName, messageBody, delaySeconds=None, hashcheck=False):
@@ -83,17 +70,10 @@ class SQSClient(AWSClient):
             if delaySeconds > 900:
                 raise UserInputException('param delaySeconds too big (max 900 seconds)')
             query['DelaySeconds'] = delaySeconds
-        status, data = yield tornado.gen.Task(self.request, query=query,
-                                              uri="/%s/%s" % (self.accNumber, qName),
-                                              signmethod=SIGNATURE_V4_HEADERS)
-        if status is True:
-            try:
-                data['awsresponse']['SendMessageResponse']['SendMessageResult']['MD5OfMessageBody']
-            except Exception as e:
-                stauts = False
-                data = e
-        self._ioloop.add_callback(functools.partial(callback, status, data))
-
+        data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
+                                      signmethod=SIGNATURE_V4_HEADERS)
+        data['awsresponse']['SendMessageResponse']['SendMessageResult']['MD5OfMessageBody']
+        self._ioloop.add_callback(functools.partial(callback, True))
 
     @tornado.gen.engine
     def changeMessageVisibility(self, callback, qName, receiptHandle, visibilityTimeout):
@@ -103,16 +83,10 @@ class SQSClient(AWSClient):
         """
         query = {'Action': 'ChangeMessageVisibility', 'ReceiptHandle': receiptHandle,
                  'VisibilityTimeout': visibilityTimeout, 'Version': '2012-11-05'}
-        status, data = yield tornado.gen.Task(self.request, query=query,
-                                              uri="/%s/%s" % (self.accNumber, qName),
+        status, data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
                                               signmethod=SIGNATURE_V4_HEADERS)
-        if status is True:
-            try:
-                data['awsresponse']['ChangeMessageVisibilityResponse']
-            except Exception as e:
-                stauts = False
-                data = e
-        self._ioloop.add_callback(functools.partial(callback, status, data))
+        data['awsresponse']['ChangeMessageVisibilityResponse']
+        self._ioloop.add_callback(functools.partial(callback, True))
 
 
     #================================== helper functionality ===========================================================
