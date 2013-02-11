@@ -240,9 +240,10 @@ class SimpleDBClient(AWSClient):
         for name in attributes:
             query['Attribute.%d.Name'%(i,)] = name
             value = attributes[name]
+            if not isinstance(value, str): value = repr(value)
             if isinstance(value, collections.Iterable):
-                query['Attribute.%d.Value'%(i,)] = attributes[name][0]
-                query['Attribute.%d.Value'%(i,)] = attributes[name][1]
+                query['Attribute.%d.Value'%(i,)] = attributes[name]
+                query['Attribute.%d.Value'%(i,)] = attributes[name]
             else:
                 query['Attribute.%d.Replace'%(i,)] = attributes[name]
             i += 1
@@ -250,8 +251,8 @@ class SimpleDBClient(AWSClient):
             i = 1
             for name in expected:
                 query['Expected.%d.Name'%(i,)] = name
-                query['Expected.%d.Value'%(i,)] = expected[name][0]
-                query['Expected.%d.Exists'%(i,)] = expected[name][1]
+                query['Expected.%d.Value'%(i,)] = expected[name]
+                query['Expected.%d.Exists'%(i,)] = expected[name]
                 i += 1
         data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
         data = data['awsresponse']
