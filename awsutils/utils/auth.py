@@ -157,6 +157,7 @@ def canonicalHeaderNames(headers):
 
 
 def canonicalRequestV4(method='GET', uri='/', headers=None, query=None, body=b''):
+    #if body is None: body = b''
     result = [method, uri, canonicalQueryString(query), canonicalHeaders(headers), '', canonicalHeaderNames(headers),
               SHA256(body)]
     return "\n".join(result)
@@ -178,8 +179,7 @@ def calculateV2Signature(secret_key, date=time.gmtime(), uri='/', method='GET', 
 
 
 def calculateV4Signature(secret_key, region, service, date=time.gmtime(), uri='/', method='GET', headers=None,
-                         query=None,
-                         body=b''):
+                         query=None, body=b''):
     simpledate = '%04d%02d%02d' % (date.tm_year, date.tm_mon, date.tm_mday)
     kDate = HMAC_SHA256("AWS4" + secret_key, simpledate, hexdigest=False)
     kRegion = HMAC_SHA256(kDate, region, hexdigest=False)
@@ -256,8 +256,6 @@ def signRequest(access_key, secret_key, endpoint, region=None, service=None,
         headers['Date'] = awsDate(date)
         canonicalRequest = canonicalRequestS3Rest(method=method, uri=uri, headers=headers, query=query,
                                                   expires=expires)
-
-        #print("canonicalRequest", canonicalRequest)
 
         headers["Authorization"] = 'AWS %s:%s' % (
             access_key,
