@@ -327,7 +327,7 @@ class SQSClient(AWSClient):
         """
         query = {'Action': 'DeleteMessage', 'ReceiptHandle': receiptHandle, 'Version': '2012-11-05'}
         data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=self.endpoint[4:-14],
-                             service='sqs', host=self.endpoint, uri="/%s/%s" % (self.accNumber, qName))
+                            service='sqs', host=self.endpoint, uri="/%s/%s" % (self.accNumber, qName))
         data['awsresponse']['DeleteMessageResponse']
 
     def deleteMessageBatch(self, qName, receiptHandles):
@@ -341,7 +341,7 @@ class SQSClient(AWSClient):
             query['DeleteMessageBatchRequestEntry.%d.Id'%(i,)] = 'id-%d'%(i,)
             query['DeleteMessageBatchRequestEntry.%d.ReceiptHandle'%(i,)] = receiptHandle
         data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=self.endpoint[4:-14],
-                             service='sqs', host=self.endpoint, uri="/%s/%s" % (self.accNumber, qName))
+                            service='sqs', host=self.endpoint, uri="/%s/%s" % (self.accNumber, qName))
         data = data['awsresponse']['DeleteMessageBatchResponse']['DeleteMessageBatchResult']
         if isinstance(data, str):
             return []
@@ -376,8 +376,8 @@ class SQSClient(AWSClient):
                                               md5message, md5calculated)
 
     #================================== helper functionality ===========================================================
-    EXCEPTIONS = extractExceptionsFromModule2Dicitonary('awsutils.exceptions.sqs',
-                                                         awsutils.exceptions.sqs.SQSException)
+    EXCEPTIONS = extractExceptionsFromModule2Dicitonary('awsutils.exceptions.sqs', awsutils.exceptions.sqs.SQSException)
+
     def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
         if 'ErrorResponse' in awsresponse and 'Error' in awsresponse['ErrorResponse']:
             error = awsresponse['ErrorResponse']['Error']
