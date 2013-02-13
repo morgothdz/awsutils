@@ -54,7 +54,7 @@ class AWSClient:
 
     @tornado.gen.engine
     def request(self, callback, endpoint=None, method='GET', uri='/', query=None, headers=None, statusexpected=None,
-                body=None, signmethod=None, region=None, service=None, date=time.gmtime(), xmlexpected=True,
+                body=b'', signmethod=None, region=None, service=None, date=time.gmtime(), xmlexpected=True,
                 connect_timeout=2, request_timeout=5):
 
         if endpoint is None: endpoint = self.endpoint
@@ -78,7 +78,8 @@ class AWSClient:
             self.count[method] = 0
         self.count[method] += 1
 
-        request = tornado.httpclient.HTTPRequest("%s://%s/?%s" % (protocol, endpoint, auth.canonicalQueryString(query)),
+        if method == "GET": body = None
+        request = tornado.httpclient.HTTPRequest("%s://%s%s?%s" % (protocol, endpoint, uri, auth.canonicalQueryString(query)),
                                                  headers=headers, body=body, streaming_callback=streamingCallback,
                                                  connect_timeout=connect_timeout, request_timeout=request_timeout)
 
@@ -92,15 +93,15 @@ class AWSClient:
             raise AWSStatusException(resultdata)
 
         if not hasattr(handler, 'exception'):
-            data = handler.getdict()
+            awsresponse = handler.getdict()
             self.checkForErrors(awsresponse, response.code, '', response.headers)
             #TODO: redirect handling
         else:
-            data = ''.join(awsresponse)
+            awsresponse = ''.join(awsresponse)
             if xmlexpected:
                 raise AWSDataException('xml-expected')
 
-        resultdata['data'] = data
+        resultdata['data'] = awsresponse
         if statusexpected is not True and response.code not in statusexpected:
             raise AWSStatusException(resultdata)
 

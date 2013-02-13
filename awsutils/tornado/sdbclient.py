@@ -31,7 +31,7 @@ class SimpleDbClient(AWSClient):
         AWSClient.__init__(self, endpoint, access_key, secret_key, secure, _ioloop = _ioloop)
 
     @tornado.gen.engine
-    def select(self, callback, domainName, selectExpression, consistentRead = False, nextToken = None):
+    def select(self, callback, selectExpression, consistentRead = False, nextToken = None):
         """
         The Select operation returns a set of Attributes for ItemNames that match the select expression
         http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/SDB_API_Select.html
@@ -46,7 +46,7 @@ class SimpleDbClient(AWSClient):
         @return: a list of dictionaries
         @rtype: list
         """
-        query = {'Action':'Select', 'DomainName':domainName, 'SelectExpression':selectExpression, 'Version': self.VERSION}
+        query = {'Action':'Select', 'SelectExpression':selectExpression, 'Version': self.VERSION}
         if consistentRead:
             query['ConsistentRead'] = consistentRead
         if nextToken is not None:
@@ -285,9 +285,9 @@ class SimpleDbClient(AWSClient):
             errors = awsresponse['Response']['Errors']['Error']
             if isinstance(errors, dict): errors = [errors]
             for error in errors:
-                self.boxUssage += error['BoxUsage']
+                self.boxUssage += float(error['BoxUsage'])
             for error in errors:
                 if error['Code'].replace('.','_') in self.EXCEPTIONS:
-                    raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus)
+                    raise self.EXCEPTIONS[error['Code'].replace('.','_')](awsresponse, httpstatus, httpreason, httpheaders)
             else:
                 raise awsutils.exceptions.sdb.SDBException(awsresponse, httpstatus, httpreason, httpheaders)
