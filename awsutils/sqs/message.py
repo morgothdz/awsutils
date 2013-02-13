@@ -20,9 +20,9 @@ class SQSMessage:
         self.messageBody = messageBody
 
     def delete(self):
-        if self.queue in None:
+        if self.queue is None:
             raise UserInputException('This message does not belong to any queue')
-        self.queue.sqsservice.sqsclient.deleteMessage(self.queue.qName, self.receiptHandle)
+        self.queue.sqsclient.deleteMessage(self.queue.qName, self.receiptHandle)
 
     def visibilityTimeoutLeft(self):
         if self.queue is None:
@@ -30,11 +30,11 @@ class SQSMessage:
         return self.VisibilityTimeout - (time.time() - self.receptionTimestamp)
 
     def changeVisibility(self, visibilityTimeout):
-        if self.queue in None:
+        if self.queue is None:
             raise UserInputException('This message does not belong to any queue')
-        if self.receiptHandle in None:
+        if self.receiptHandle is None:
             raise UserInputException('This message does not have a receipt handle')
-        self.queue.sqsservice.sqsclient.changeMessageVisibility(self.queue.qName, self.receiptHandle, visibilityTimeout)
+        self.queue.lsqsclient.changeMessageVisibility(self.queue.qName, self.receiptHandle, visibilityTimeout)
         self.VisibilityTimeout = visibilityTimeout
 
     def __repr__(self):
