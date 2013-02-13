@@ -131,16 +131,16 @@ class SimpleDbClient(AWSClient):
         i = 1
         if isinstance(attributes, dict): attributes = attributes.items()
         for attribute in attributes:
-            name = attribute[0]
-            value = attributes[1]
-            query['Attribute.%d.Name'%(i,)] = name
-            if not isinstance(value, str): value = repr(value)
-            if isinstance(value, collections.Iterable):
-                query['Attribute.%d.Value'%(i,)] = attributes[name]
-                query['Attribute.%d.Value'%(i,)] = attributes[name]
+            value = attribute[1]
+            query['Attribute.%d.Name'%(i,)] = attribute[0]
+            if isinstance(value, tuple) or isinstance(value, list):
+                query['Attribute.%d.Value'%(i,)] = value[0]
+                query['Attribute.%d.Replace'%(i,)] = value[1]
             else:
-                query['Attribute.%d.Replace'%(i,)] = attributes[name]
+                if not isinstance(value, str): value = repr(value)
+                query['Attribute.%d.Value'%(i,)] = value
             i += 1
+
         if expected is not None:
             i = 1
             for name in expected:
