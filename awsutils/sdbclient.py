@@ -197,8 +197,8 @@ class SimpleDBClient(AWSClient):
         @type attributeName: str
         @param consistentRead: when set to true, ensures that the most recent data is returned
         @type consistentRead: bool
-        @return: a list of attributes
-        @rtype: list
+        @return: a tuple of tuples (key, value)
+        @rtype: tuple
         """
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'GetAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': '2009-04-15'}
@@ -213,7 +213,8 @@ class SimpleDBClient(AWSClient):
         if isinstance(data, str):
             return None
         data = data['Attribute']
-        if isinstance(data, dict): return [data]
+        if isinstance(data, dict): data = (data['Name'], data['Value'])
+        else: data = tuple((attr['Name'],attr['Value']) for attr in data)
         return data
 
     def putAttributes(self, domainName, itemName, attributes, expected=None, endpoint=None):
@@ -228,7 +229,8 @@ class SimpleDBClient(AWSClient):
                       ex: {"someattributename" : "somevalue",
                           "someotherattributename" : ("somevalue", True) #=> indicates force owerwrite
                           }
-        @type attributes: dict
+                      or (("someattributename", "somevalue"), ("someotherattrname", "somevalue", True))
+        @type attributes: dict, tuple
         @param expected: manipulate the attributes only if this attributes exist
                       ex: {"someattributename" : ("somevalue", 1),
                           "someotherattributename" : ("somevalue", 0)}
@@ -237,9 +239,11 @@ class SimpleDBClient(AWSClient):
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'PutAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': '2009-04-15'}
         i = 1
-        for name in attributes:
+        if isinstance(attributes, dict): attributes = attributes.items()
+        for attribute in attributes:
+            name = attribute[0]
+            value = attributes[1]
             query['Attribute.%d.Name'%(i,)] = name
-            value = attributes[name]
             if not isinstance(value, str): value = repr(value)
             if isinstance(value, collections.Iterable):
                 query['Attribute.%d.Value'%(i,)] = attributes[name]

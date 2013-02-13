@@ -76,10 +76,8 @@ class SimpleDbClient(AWSClient):
         @type attributeName: str
         @param consistentRead: when set to true, ensures that the most recent data is returned
         @type consistentRead: bool
-        @return: a list of attributes
-        @rtype: list
-        @return: a list of dictionaries
-        @rtype: list
+        @return: a tuple of tuples (key, value)
+        @rtype: tuple
         """
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'GetAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': self.VERSION}
@@ -93,11 +91,13 @@ class SimpleDbClient(AWSClient):
         data = data['data']
         self.boxUssage += float(data['GetAttributesResponse']['ResponseMetadata']['BoxUsage'])
         data = data['GetAttributesResponse']['GetAttributesResult']
+
         if isinstance(data, str):
             data = None
         else:
             data = data['Attribute']
-            if isinstance(data, dict): data = [data]
+            if isinstance(data, dict): data = (data['Name'], data['Value'])
+            else: data = tuple((attr['Name'],attr['Value']) for attr in data)
 
         self._ioloop.add_callback(functools.partial(callback, data))
 
@@ -117,7 +117,8 @@ class SimpleDbClient(AWSClient):
                       ex: {"someattributename" : "somevalue",
                           "someotherattributename" : ("somevalue", True) #=> indicates force owerwrite
                           }
-        @type attributes: dict
+                      or (("someattributename", "somevalue"), ("someotherattrname", "somevalue", True))
+        @type attributes: dict, tuple
         @param expected: manipulate the attributes only if this attributes exist
                       ex: {"someattributename" : ("somevalue", 1),
                           "someotherattributename" : ("somevalue", 0)}
@@ -128,9 +129,11 @@ class SimpleDbClient(AWSClient):
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'PutAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': self.VERSION}
         i = 1
-        for name in attributes:
+        if isinstance(attributes, dict): attributes = attributes.items()
+        for attribute in attributes:
+            name = attribute[0]
+            value = attributes[1]
             query['Attribute.%d.Name'%(i,)] = name
-            value = attributes[name]
             if not isinstance(value, str): value = repr(value)
             if isinstance(value, collections.Iterable):
                 query['Attribute.%d.Value'%(i,)] = attributes[name]
@@ -151,7 +154,7 @@ class SimpleDbClient(AWSClient):
         self._ioloop.add_callback(functools.partial(callback, True))
 
     @tornado.gen.engine
-    def deleteAttributes(self, callback, domainName, itemName, attributes, expected=None, endpoint=None):
+    def deleteAttributes(self, callback, domainName, itemName, attributes=None, expected=None, endpoint=None):
         """
         Delete atributes from itemName in domainName
         http://docs.aws.amazon.com/AmazonSimpleDB/latest/DeveloperGuide/SDB_API_DeleteAttributes.html
@@ -175,12 +178,13 @@ class SimpleDbClient(AWSClient):
         """
         if endpoint is None: endpoint = self.endpoint
         query = {'Action': 'DeleteAttributes', 'ItemName': itemName, 'DomainName':domainName, 'Version': self.VERSION}
-        i = 1
-        for name in attributes:
-            query['Attribute.%d.Name'%(i,)] = name
-            value = attributes[name]
-            query['Attribute.%d.Value'%(i,)] = value
-            i += 1
+        if attributes is not None:
+            i = 1
+            for name in attributes:
+                query['Attribute.%d.Name'%(i,)] = name
+                value = attributes[name]
+                query['Attribute.%d.Value'%(i,)] = value
+                i += 1
         if expected is not None:
             i = 1
             for name in expected:
