@@ -76,6 +76,10 @@ class SQSQueue:
                     break
                 time.sleep(self.COOLDOWN_BETWEEN_RECEIVEMESSAGES)
 
+        if messages == []:
+            if maxNumberOfMessages == 1: return None
+            else: return []
+
         result = []
         if visibilityTimeout is None:
             visibilityTimeout = int(self.VisibilityTimeout)
@@ -89,7 +93,7 @@ class SQSQueue:
             message.receptionTimestamp = time.time()
             for attribute in item['Attribute']:
                 setattr(message, attribute['Name'], attribute['Value'])
-            if maxNumberOfMessages == 0:
+            if maxNumberOfMessages == 1:
                 return message
             result.append(message)
         return result
