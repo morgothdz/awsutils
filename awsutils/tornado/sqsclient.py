@@ -104,7 +104,7 @@ class SQSClient(AWSClient):
 
     #================================== helper functionality ===========================================================
 
-    EXCEPTIONS = extractExceptionsFromModule2Dicitonary('awsutils.exceptions.sdb', awsutils.exceptions.sqs.SDBException)
+    EXCEPTIONS = extractExceptionsFromModule2Dicitonary('awsutils.exceptions.sqs', awsutils.exceptions.sqs.SQSException)
 
     def checkForErrors(self, awsresponse, httpstatus, httpreason, httpheaders):
         if 'ErrorResponse' in awsresponse and 'Error' in awsresponse['ErrorResponse']:
