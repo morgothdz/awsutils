@@ -59,7 +59,7 @@ class SQSClient(AWSClient):
 
         data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
                                       signmethod=SIGNATURE_V4_HEADERS, region=self.endpoint[4:-14], service='sqs')
-        data = data['awsresponse']['ReceiveMessageResponse']['ReceiveMessageResult']
+        data = data['data']['ReceiveMessageResponse']['ReceiveMessageResult']
         if not isinstance(data, dict):
             data = None
         elif isinstance(data['Message'], dict):
@@ -74,7 +74,7 @@ class SQSClient(AWSClient):
         query = {'Action': 'DeleteMessage', 'ReceiptHandle': receiptHandle, 'Version': '2012-11-05'}
         data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
                                       signmethod=SIGNATURE_V4_HEADERS, region=self.endpoint[4:-14], service='sqs')
-        data['awsresponse']['DeleteMessageResponse']
+        data['data']['DeleteMessageResponse']
         self._ioloop.add_callback(functools.partial(callback, True))
 
     @tornado.gen.engine
@@ -86,7 +86,7 @@ class SQSClient(AWSClient):
             query['DelaySeconds'] = delaySeconds
         data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
                                       signmethod=SIGNATURE_V4_HEADERS, region=self.endpoint[4:-14], service='sqs')
-        data['awsresponse']['SendMessageResponse']['SendMessageResult']['MD5OfMessageBody']
+        data['data']['SendMessageResponse']['SendMessageResult']['MD5OfMessageBody']
         self._ioloop.add_callback(functools.partial(callback, True))
 
     @tornado.gen.engine
@@ -97,9 +97,9 @@ class SQSClient(AWSClient):
         """
         query = {'Action': 'ChangeMessageVisibility', 'ReceiptHandle': receiptHandle,
                  'VisibilityTimeout': visibilityTimeout, 'Version': '2012-11-05'}
-        status, data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
-                                              signmethod=SIGNATURE_V4_HEADERS, region=self.endpoint[4:-14], service='sqs')
-        data['awsresponse']['ChangeMessageVisibilityResponse']
+        data = yield tornado.gen.Task(self.request, query=query, uri="/%s/%s" % (self.accNumber, qName),
+                                      signmethod=SIGNATURE_V4_HEADERS, region=self.endpoint[4:-14], service='sqs')
+        data['data']['ChangeMessageVisibilityResponse']
         self._ioloop.add_callback(functools.partial(callback, True))
 
 
