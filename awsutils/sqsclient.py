@@ -137,7 +137,7 @@ class SQSClient(AWSClient):
             i += 1
 
         if visibilityTimeout is not None:
-            if not isinstance(visibilityTimeout, int) or not 1024 <= visibilityTimeout <= 65536:
+            if not isinstance(visibilityTimeout, int) or not 0 <= visibilityTimeout <= 43200:
                 raise UserInputException("param visibilityTimeout sould be an integer between 0 and 43200 (12 hours)")
             query["Attribute.%d.Name"%(i,)] = "VisibilityTimeout"
             query["Attribute.%d.Value"%(i,)] = visibilityTimeout
@@ -206,7 +206,7 @@ class SQSClient(AWSClient):
             i += 1
 
         if visibilityTimeout is not None:
-            if not isinstance(visibilityTimeout, int) or not 1024 <= visibilityTimeout <= 65536:
+            if not isinstance(visibilityTimeout, int) or not 0 <= visibilityTimeout <= 43200:
                 raise UserInputException("param visibilityTimeout sould be an integer between 0 and 43200 (12 hours)")
             query["Attribute.%d.Name"%(i,)] = "VisibilityTimeout"
             query["Attribute.%d.Value"%(i,)] = visibilityTimeout
