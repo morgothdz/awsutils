@@ -340,6 +340,7 @@ class SQSClient(AWSClient):
         for receiptHandle in receiptHandles:
             query['DeleteMessageBatchRequestEntry.%d.Id'%(i,)] = 'id-%d'%(i,)
             query['DeleteMessageBatchRequestEntry.%d.ReceiptHandle'%(i,)] = receiptHandle
+            i += 1
         data = self.request(method="GET", signmethod=SIGNATURE_V4_HEADERS, query=query, region=self.endpoint[4:-14],
                             service='sqs', host=self.endpoint, uri="/%s/%s" % (self.accNumber, qName))
         data = data['awsresponse']['DeleteMessageBatchResponse']['DeleteMessageBatchResult']
