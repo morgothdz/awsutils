@@ -35,8 +35,8 @@ class SimpleDBClient(AWSClient):
             query['Item.%d.ItemName'%(i,)] = itemName
             a = 1
             for attributeName in items[itemName]:
-                query['Item.%d.Attribute.%d.name'%(i,a)] = attributeName
-                query['Item.%d.Attribute.%d.value'%(i,a)] = items[itemName][attributeName]
+                query['Item.%d.Attribute.%d.Name'%(i,a)] = attributeName
+                query['Item.%d.Attribute.%d.Value'%(i,a)] = items[itemName][attributeName]
                 a += 1
             i += 1
         data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
@@ -68,13 +68,13 @@ class SimpleDBClient(AWSClient):
             for attributeName in items[itemName]:
                 if a > 256:
                     raise UserInputException('256 attribute name-value pairs per item exceded')
-                query['Item.%d.Attribute.%d.name'%(i,a)] = attributeName
+                query['Item.%d.Attribute.%d.Name'%(i,a)] = attributeName
                 v = items[itemName][attributeName]
-                if isinstance(v, collections.Iterable):
-                    query['Item.%d.Attribute.%d.value'%(i,a)] = v[0]
-                    query['Item.%d.Attribute.%d.replace'%(i,a)] = v[1]
+                if isinstance(v, (list, tuple)):
+                    query['Item.%d.Attribute.%d.Value'%(i,a)] = v[0]
+                    query['Item.%d.Attribute.%d.Replace'%(i,a)] = v[1]
                 else:
-                    query['Item.%d.Attribute.%d.value'%(i,a)] = v
+                    query['Item.%d.Attribute.%d.Value'%(i,a)] = v
                 a += 1
             i += 1
         data = self.request(method="GET", signmethod=SIGNATURE_V2, query=query, host=endpoint)
