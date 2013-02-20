@@ -11,7 +11,10 @@ will be and useful addition to the python world.
 Highlights
 ----------
 #. Python3 compatible, it's developed using python3.2
-#. Amazon **SQS** low and high level API with the most usual functions implemented
+#. Amazon **SQS** low level API 
+#. Amazon **SQS** high level API with the most usual functions implemented
+#. Amazon **SQS** low level API **asynchronous** implementation based on **tornado**,
+   with the most usual functions implemented
 #. Amazon **SimpleDB** low level API
 #. Amazon **SimpleDB** low level API **asynchronous** implementation based on **tornado**,
    with the most usual functions implemented
