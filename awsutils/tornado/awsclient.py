@@ -78,10 +78,10 @@ class AWSClient:
             self.count[method] = 0
         self.count[method] += 1
 
-        if method == "GET": body = None
+        if method != "POST": body = None
         request = tornado.httpclient.HTTPRequest("%s://%s%s?%s" % (protocol, endpoint, uri, auth.canonicalQueryString(query)),
                                                  headers=headers, body=body, streaming_callback=streamingCallback,
-                                                 connect_timeout=connect_timeout, request_timeout=request_timeout)
+                                                 connect_timeout=connect_timeout, request_timeout=request_timeout, method=method)
 
         #TODO: timeout handling
 
@@ -93,15 +93,18 @@ class AWSClient:
             raise AWSStatusException(resultdata)
 
         if not hasattr(handler, 'exception'):
-            awsresponse = handler.getdict()
-            self.checkForErrors(awsresponse, response.code, '', response.headers)
+            awsresponsexml = handler.getdict()
+            self.checkForErrors(awsresponsexml, response.code, '', response.headers)
             #TODO: redirect handling
         else:
-            awsresponse = ''.join(awsresponse)
             if xmlexpected:
                 raise AWSDataException('xml-expected')
 
-        resultdata['data'] = awsresponse
+        if xmlexpected:
+            resultdata['data'] = awsresponsexml
+        else:
+            resultdata['data'] = b''.join(awsresponse)
+
         if statusexpected is not True and response.code not in statusexpected:
             raise AWSStatusException(resultdata)
 
