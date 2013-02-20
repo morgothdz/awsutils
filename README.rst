@@ -6,7 +6,7 @@ Foreword
 While there already exists other python AWS library (boto) it lacks  
 **python3** support. For my projects (and I trust that for others too)
 **Python3** support and some asynchronous handling is a must. I hope **awsutils**
-will be and useful addition to the python world.
+will be an useful addition to the python world.
 
 Highlights
 ----------
@@ -21,6 +21,8 @@ Highlights
 #. Amazon **S3** low level API (incomplete) and higher level API (incomplete), 
    still the S3Bucket contains two high level powerful file manipulation functions, making 
    large file upload and download secure and transparent.
+#. Amazon **S3** low level API **asynchronous** implementation based on **tornado**,
+   with the most some of the usual functions implemented
 #. HTTP connection pool with "Connection: keep-alive"
 #. Structured on two levels, a low level translating directly the amazon API's, 
    and a higher one, where things are organized in classes etc..
