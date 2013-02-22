@@ -87,7 +87,7 @@ class AWSClient:
 
         response = yield tornado.gen.Task(self.http_client.fetch, request)
 
-        resultdata = {'status':response.code, 'headers':dict(response.headers), 'data':None}
+        resultdata = {'status':response.code, 'headers':dict(response.headers), 'data':None, 'reason':response.reason}
 
         if response.code == 599:
             raise AWSStatusException(resultdata)
