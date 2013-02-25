@@ -90,6 +90,7 @@ class AWSClient:
         resultdata = {'status':response.code, 'headers':dict(response.headers), 'data':None}
 
         if response.code == 599:
+            resultdata['reason'] = response.reason
             raise AWSStatusException(resultdata)
 
         if not hasattr(handler, 'exception'):

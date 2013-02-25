@@ -157,8 +157,9 @@ class AWSClient:
             if xmlexpected or ('Content-Type' in response.headers and
                                response.headers['Content-Type'] in ('application/xml', 'text/xml')):
 
-                if ('Content-Length' not in response.headers) and ('Transfer-Encoding' not in response.headers or
-                                                                   response.headers['Transfer-Encoding'] != 'chunked'):
+                if ('Content-Length' not in response.headers) and \
+                   ('Transfer-Encoding' not in response.headers or response.headers['Transfer-Encoding'] != 'chunked') and \
+                   ('Connection' not in response.headers or response.headers['Connection'] != 'close'):
                 #every xml response should have 'Content-Length' set or 'Transfer-Encoding' = chunked
                 #take a peek of the data then consume the rest of it
                     try:
