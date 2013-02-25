@@ -53,7 +53,7 @@ class AWSClient:
         pass
 
     @tornado.gen.engine
-    def request(self, callback, endpoint=None, method='GET', uri='/', query=None, headers=None, statusexpected=None,
+    def request(self, callback, endpoint=None, method='GET', uri='/', query={}, headers={}, statusexpected=None,
                 body=b'', signmethod=None, region=None, service=None, date=time.gmtime(), xmlexpected=True,
                 connect_timeout=2, request_timeout=5):
 
@@ -78,7 +78,7 @@ class AWSClient:
             self.count[method] = 0
         self.count[method] += 1
 
-        if method != "POST": body = None
+        if method not in ["POST", "PUT"]: body = None
         request = tornado.httpclient.HTTPRequest("%s://%s%s?%s" % (protocol, endpoint, uri, auth.canonicalQueryString(query)),
                                                  headers=headers, body=body, streaming_callback=streamingCallback,
                                                  connect_timeout=connect_timeout, request_timeout=request_timeout, method=method)

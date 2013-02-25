@@ -51,7 +51,7 @@ class S3Client(AWSClient):
                                       statusexpected=statusexpected, headers=headers, xmlexpected=False,
                                       signmethod=SIGNATURE_S3_REST)
 
-        self._ioloop.add_callback(functools.partial(callback, data))
+        self._ioloop.add_callback(functools.partial(callback, data['data']))
 
     @tornado.gen.engine
     def headObject(self, callback, bucketname, objectname, versionID=None, byterange=None, if_modified_since=None,
@@ -89,7 +89,16 @@ class S3Client(AWSClient):
                                       statusexpected=statusexpected, headers=headers, xmlexpected=False, method='HEAD',
                                       signmethod=SIGNATURE_S3_REST)
 
-        self._ioloop.add_callback(functools.partial(callback, data))
+        self._ioloop.add_callback(functools.partial(callback, data['status']))
+
+    @tornado.gen.engine
+    def putObject(self, callback, bucketname, objectname, value):
+        uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
+
+        yield tornado.gen.Task(self.request, uri=uri + urlquote(objectname), endpoint=endpoint, body=value,
+                               xmlexpected=False, method='PUT', signmethod=SIGNATURE_S3_REST)
+
+        self._ioloop.add_callback(functools.partial(callback, True))
 
     #================================== helper functionality ===========================================================
     def _buketname2PathAndEndpoint(self, bucketname):
@@ -103,7 +112,6 @@ class S3Client(AWSClient):
         if isinstance(awsresponse, dict):
             if 'Error' in awsresponse:
                 if awsresponse['Error']['Code'] in self.EXCEPTIONS:
-                    raise self.EXCEPTIONS[awsresponse['Error']['Code']](awsresponse, httpstatus, httpreason,
-                                                                        httpheaders)
+                    raise self.EXCEPTIONS[awsresponse['Error']['Code']](awsresponse, httpstatus, httpreason, httpheaders)
                 else:
                     raise awsutils.exceptions.s3.S3Exception(awsresponse, httpstatus, httpreason, httpheaders)
