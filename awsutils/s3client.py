@@ -103,11 +103,22 @@ class S3Client(AWSClient):
         data = self.request(method="GET", uri=uri, host=endpoint, query=query, signmethod=SIGNATURE_S3_REST)
         return data['awsresponse']['ListMultipartUploadsResult']
 
+    def putBucket(self, bucketname,
+                 #TODO: not handled yet
+                 x_amz_acl=None,
+                 x_amz_grant_read=None, x_amz_grant_write=None, x_amz_grant_read_acp=None, x_amz_grant_write_acp=None,
+                 x_amz_grant_full_control=None):
+
+        uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
+        data = self.request(method="PUT", uri=uri, host=endpoint,
+                            statusexpected=[200], signmethod=SIGNATURE_S3_REST)
+        return data['awsresponse']['CreateBucketConfiguration']['LocationConstraint']
+
     def putBucketPolicy(self, bucketname, policy):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
         if isinstance(policy, dict):
             policy = json.dumps(policy)
-        data = self.request(method="PUT", uri=uri, body=policy, host=endpoint,
+        data = self.request(method="PUT", uri=uri, host=endpoint, body=policy,
                             statusexpected=[204], query={'policy': None},
                             signmethod=SIGNATURE_S3_REST)
         #TODO: finish this
