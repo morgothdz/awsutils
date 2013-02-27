@@ -215,7 +215,6 @@ class AWSClient:
                     if self.checkForErrors(awsresponse, response.status, response.reason, response.headers) is True:
                         if _retrycount < retry:
                             _retrycount += 1
-                            doretry = True
                             break
 
                 resultdata = {'status':response.status, 'reason':response.reason, 'headers':dict(response.headers),
@@ -257,11 +256,12 @@ class AWSClient:
 
             #if we are here then most probably we want to download some data
             size = int(response.headers['Content-Length'])
+            sizeinfo = {}
             if response.status == 206:
                 contentrange = response.headers['Content-Range']
                 contentrange = contentrange.split(' ')[1].split('/')
-                range = contentrange[0].split('-')
-                sizeinfo = {'size': int(contentrange[1]), 'start': int(range[0]), 'end': int(range[1]), 'downloaded': 0}
+                crange = contentrange[0].split('-')
+                sizeinfo = {'size': int(contentrange[1]), 'start': int(crange[0]), 'end': int(crange[1]), 'downloaded': 0}
             elif response.status == 200:
                 sizeinfo = {'size': size, 'start': 0, 'end': size - 1, 'downloaded': 0}
 
