@@ -53,9 +53,12 @@ class AWSClient:
         pass
 
     @tornado.gen.engine
-    def request(self, callback, endpoint=None, method='GET', uri='/', query={}, headers={}, statusexpected=None,
+    def request(self, callback, endpoint=None, method='GET', uri='/', query=None, headers=None, statusexpected=None,
                 body=b'', signmethod=None, region=None, service=None, date=time.gmtime(), xmlexpected=True,
                 connect_timeout=2, request_timeout=5):
+
+        if query is None: query = {}
+        if headers is None: headers = {}
 
         if endpoint is None: endpoint = self.endpoint
         if statusexpected is None: statusexpected = [200]
