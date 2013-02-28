@@ -112,7 +112,7 @@ class S3Client(AWSClient):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
         data = self.request(method="PUT", uri=uri, host=endpoint,
                             statusexpected=[200], signmethod=SIGNATURE_S3_REST)
-        return data['awsresponse']['CreateBucketConfiguration']['LocationConstraint']
+        return data['headers']['Location']
 
     def putBucketPolicy(self, bucketname, policy):
         uri, endpoint = self._buketname2PathAndEndpoint(bucketname)
